@@ -373,7 +373,7 @@ if($verbose) {
 }
 
 if($verbose) {
-    print STDERR "Consensus generated. Output written to ", $outDir."allSeqsAlignedConsensus.fasta and ", $outDir."allSeqsAlignedTable.txt\n";
+    print STDERR "Consensus generated. Output written to ", $outDir."Consensus.fasta and ", $outDir."ConsensusTable.txt\n";
 }
 
 
