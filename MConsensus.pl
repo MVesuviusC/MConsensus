@@ -8,7 +8,7 @@ use LWP::Simple;
 ##############################
 # By Matt Cannon
 # Date: May 7, 2016
-# Last modified: May 25, 2016
+# Last modified: June 10, 2016
 # Title: MConsensus.pl
 # Purpose: generate consensus sequence for a specified gene in a specified taxon
 ##############################
