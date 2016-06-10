@@ -355,6 +355,9 @@ for my $baseNum ( sort {$a <=> $b} keys %alignmentHash) {
                 print TABLEFILE "0\t";
             }
         }
+        if ( $consensusBase eq "" ) {   # If all bases are below the min %cutoff
+            $consensusBase = "N";
+        }
         print TABLEFILE $ambiguityHash{$consensusBase}, "\t";
     } else {
         print TABLEFILE "0\t0\t0\t0\t";
