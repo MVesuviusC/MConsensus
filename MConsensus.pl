@@ -491,4 +491,54 @@ if($verbose) {
 
 =back
 
+Output files
+
+allSeqsAligned.fasta
+
+    All sequences (both blast results and sequences retrieved from NCBI), aligned.
+
+allSeqs.fasta
+
+    All sequences (both blast results and sequences retrieved from NCBI).
+
+blastFasta.fasta
+
+    Fasta file of sequences from Blast results
+
+blastResults.txt
+
+    Results of Blasting the originalGis.fasta
+
+Consensus.fasta
+
+    Final file that you will want to look at. Fasta file of the consensus.
+
+ConsensusTable.txt
+
+    Table of the numbers used to generate the consensus. 
+    Columns are: 
+        Base - base number 0:length(sequence)
+        A - number of "A"s in the aligned sequence
+        T - number of "T"s in the aligned sequence       
+        G - number of "G"s in the aligned sequence       
+        C - number of "C"s in the aligned sequence
+        Consensus - consensus call - note that the consensus takes the minAF option into account   
+        Missing - number of sequences with zero coverage at this location
+
+organismGis.txt
+
+    List of all GIs matching the query organism. Used to limit the blast search to just the target organism.
+
+originalGis.fasta
+
+    Sequences of the GIs retrieved from NCBI
+
+originalGis.html
+    
+    Data retrieved from NCBI search. Used to extract the GIs for sequence retrieval.
+
+originalGis.txt
+
+    GIs extracted from originalGis.html
+
 =cut
