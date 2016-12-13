@@ -3,7 +3,6 @@ use warnings;
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use LWP::Simple;
 
 ##############################
 # By Matt Cannon
@@ -20,12 +19,14 @@ use LWP::Simple;
 
 my $retmax = 1000;
 my $organism = "salamanders";
-my $gene = "mitochondria+\"complete+genome\"";
+my $gene = "mitochondrion+\"complete+genome\"";
 my $email = "matthewvc1\@gmail.com";
 my $outDir = "";
 my $blastDb = "nt";
 my $blastHitCount = 10;
 my $p = 1;
+my $clustalo;
+my $mafft;
 my $pidentCutoff = 80;
 my $minAf = 20;
 my $blMinLen = 100;
@@ -40,6 +41,8 @@ GetOptions ("retmax=i"          => \$retmax,
             "blastDb=s"         => \$blastDb,
             "blastHitCount=i"   => \$blastHitCount,
             "processors=i"      => \$p,
+	    "clustalo"          => \$clustalo,
+	    "mafft"             => \$mafft,
             "percIdentCutoff=i" => \$pidentCutoff,
             "blastMinLen=i"     => \$blMinLen,
             "minAF=i"           => \$minAf,
@@ -105,11 +108,11 @@ if($verbose) {
 
 ##############################
 ### Get gis from nucleotide database web query and put in tempdir/(originalGis.html)
-my $esearch = $nucSearch . "&retmax=" . $retmax . "&email=" . $email . "&term=(" . $organism . "[Organism]" . "+AND+" . $gene . ")";
+my $esearch = "GET \"" . $nucSearch . "&retmax=" . $retmax . "&email=" . $email . "&term=(" . $organism . "[Organism]" . "+AND+" . $gene . ")\"";
 if($verbose) {
     print STDERR "Retrieving list of gis from: ", $esearch, "\n";
 }
-my $response = get($esearch);
+my $response = `$esearch`;
 open (GIHTML, ">", $outDir."originalGis.html") or die "Cannot open originalGis.html, check permissions\n";
 print GIHTML $response, "\n";
 push @tempFiles, $outDir."originalGis.html";
@@ -138,7 +141,7 @@ if($verbose) {
     print STDERR scalar(@giArray), " gis parsed and written to ", $outDir."originalGis.txt", "\n\n";
 }
 if(scalar(@giArray) == 0) {
-    print STDERR "No sequences retrieved from NCBI. Please check your search terms at http://www.ncbi.nlm.nih.gov/nuccore/";
+    print STDERR "No sequences retrieved from NCBI. Please check your search terms at http://www.ncbi.nlm.nih.gov/nuccore/\n";
     die;
 }
 
@@ -146,7 +149,8 @@ if(scalar(@giArray) == 0) {
 ### Get fasta seqeunces for originalGis.txt and make tempdir/(originalGis.fasta)
 ### Include email in web query
 ### Report how long it took
-my $seqResponse = get($efetch . join(",", @giArray) . "&email=" . $email .  ")");
+my $command = "GET \"$efetch" . join(',', @giArray) . "&email=". $email . ")\"";
+my $seqResponse = `$command`;
 open (GIFASTAS, ">", $outDir."originalGis.fasta") or die "Cannot create originalGis.txt, check permissions\n";
 print GIFASTAS $seqResponse, "\n";
 push @tempFiles, $outDir."originalGis.fasta";
@@ -159,12 +163,12 @@ if($verbose) {
 ### Generate list of gis for $organism to use in blast search
 ### Report how long it took
 
-my $giSearch = $nucSearch . "&retmax=100000" . "&email=" . $email . "&term=(" . $organism . "[Organism]" . ")";
+my $giSearch = "GET \"" . $nucSearch . "&retmax=100000" . "&email=" . $email . "&term=(" . $organism . "[Organism]" . ")\"";
 if($verbose) {
     print STDERR "Retrieving list of gis matching ", $organism, " from: ", $giSearch, "\n";
     print STDERR "Retrieving batch #", $giRetrieveNum, " from ncbi.\n";
 }
-my $giResponse = get($giSearch);
+my $giResponse = `$giSearch`;
 
 $giResponse =~ s/[\n\s\"]//g;
 # get rid of everything up to the id list
@@ -176,9 +180,9 @@ while(scalar(@orgGiArray % 100000 == 0)) {
     if($verbose) {
         print STDERR "Retrieving batch #", $giRetrieveNum + 1, " from ncbi.\n";
     }
-    # get more gis, starting after the first 100,000
-    $giSearch = $nucSearch . "&retmax=100000&retstart=" . $giRetrieveNum * 100000 . "&email=" . $email . "&term=(" . $organism . "[Organism]" . ")";
-    $giResponse = get($giSearch);
+# get more gis, starting after the first 100,000
+    $giSearch = "GET \"" . $nucSearch . "&retmax=100000&retstart=" . $giRetrieveNum * 100000 . "&email=" . $email . "&term=(" . $organism . "[Organism]" . ")\"";
+$giResponse = `$giSearch`;
     $giResponse =~ s/[\n\s\"]//g;
     # get rid of everything up to the id list
     $giResponse =~ s/.+idlist:\[//; 
@@ -260,15 +264,31 @@ if($verbose) {
 }
 
 ############################
-### Use kalign to align blastResults.fasta and originalGis.fasta (aligned.aln)
+### Align blastResults.fasta and originalGis.fasta (aligned.aln)
 
-if($verbose) {
-    print STDERR "Combining original fasta sequences and blast result sequences and aligning using clustalo\n";
-}
 system("cat " . $outDir . "blastFasta.fasta " . $outDir . "originalGis.fasta > " . $outDir . "allSeqs.fasta");
-system("kalign", "-i", $outDir . "allSeqs.fasta", "-o", $outDir."allSeqsAligned.fasta", );
-# Clustalo was slower
-#system("clustalo", "--threads", $p, "-i", $outDir . "allSeqs.fasta", "--out", $outDir."allSeqsAligned.fasta" );
+my $alignCommand;
+
+if($clustalo) {
+    # Clustalo was slower
+    if($verbose) {
+	print STDERR "Combining original fasta sequences and blast result sequences and aligning using clustalo\n";
+    }
+    $alignCommand = "clustalo" . " --threads " . $p . " -i " . $outDir . "allSeqs.fasta" . " --out " . $outDir . "allSeqsAligned.fasta";
+} elsif($mafft) {
+    if($verbose) {
+	print STDERR "Combining original fasta sequences and blast result sequences and aligning using mafft\n";
+    }
+    $alignCommand = "mafft --adjustdirectionaccurately --globalpair --thread " . $p . " " . $outDir . "allSeqs.fasta > " . $outDir."allSeqsAligned.fasta";
+
+} else {
+    if($verbose) {
+	print STDERR "Combining original fasta sequences and blast result sequences and aligning using kalign\n";
+    }
+    $alignCommand = "kalign -i " . $outDir . "allSeqs.fasta" . " -o " . $outDir . "allSeqsAligned.fasta";
+}
+my $doit = `$alignCommand`;
+
 if($verbose) {
     print STDERR "Alignment completed\n\n";
 }
@@ -493,55 +513,5 @@ if($verbose) {
     Print out this "helpful" information. 
 
 =back
-
-Output files
-
-allSeqsAligned.fasta
-
-    All sequences (both blast results and sequences retrieved from NCBI), aligned.
-
-allSeqs.fasta
-
-    All sequences (both blast results and sequences retrieved from NCBI).
-
-blastFasta.fasta
-
-    Fasta file of sequences from Blast results
-
-blastResults.txt
-
-    Results of Blasting the originalGis.fasta
-
-Consensus.fasta
-
-    Final file that you will want to look at. Fasta file of the consensus.
-
-ConsensusTable.txt
-
-    Table of the numbers used to generate the consensus. 
-    Columns are: 
-        Base - base number 0:length(sequence)
-        A - number of "A"s in the aligned sequence
-        T - number of "T"s in the aligned sequence       
-        G - number of "G"s in the aligned sequence       
-        C - number of "C"s in the aligned sequence
-        Consensus - consensus call - note that the consensus takes the minAF option into account   
-        Missing - number of sequences with zero coverage at this location
-
-organismGis.txt
-
-    List of all GIs matching the query organism. Used to limit the blast search to just the target organism.
-
-originalGis.fasta
-
-    Sequences of the GIs retrieved from NCBI
-
-originalGis.html
-    
-    Data retrieved from NCBI search. Used to extract the GIs for sequence retrieval.
-
-originalGis.txt
-
-    GIs extracted from originalGis.html
 
 =cut
