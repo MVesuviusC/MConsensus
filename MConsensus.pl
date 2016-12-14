@@ -24,9 +24,10 @@ my $email = "matthewvc1\@gmail.com";
 my $outDir = "";
 my $blastDb = "nt";
 my $blastHitCount = 10;
+my $maxEval = 0.001;
 my $p = 1;
 my $clustalo;
-my $mafft;
+my $kalign;
 my $pidentCutoff = 80;
 my $minAf = 20;
 my $blMinLen = 100;
@@ -40,9 +41,10 @@ GetOptions ("retmax=i"          => \$retmax,
             "outDir=s"          => \$outDir,
             "blastDb=s"         => \$blastDb,
             "blastHitCount=i"   => \$blastHitCount,
+	    "maxEval=i"         => \$maxEval,
             "processors=i"      => \$p,
 	    "clustalo"          => \$clustalo,
-	    "mafft"             => \$mafft,
+	    "kalign"            => \$kalign,
             "percIdentCutoff=i" => \$pidentCutoff,
             "blastMinLen=i"     => \$blMinLen,
             "minAF=i"           => \$minAf,
@@ -247,10 +249,14 @@ while(my $blastInput = <BLASTRESULTS>){
     my ($sgi, $staxids, $length, $pident, $evalue, $bitscore, $sscinames, $sseq) = split "\t", $blastInput;
     $sseq =~ s/-//g; # get rid of insertions in the alignment
     if(exists($blastResultsHash{$sscinames})){
-        if(length($blastResultsHash{$sscinames . " " . $sgi}) < length($sseq) && $pident >= $pidentCutoff) {
-            $blastResultsHash{$sscinames . " " . $sgi} = $sseq;
+        if(length($blastResultsHash{$sscinames . " " . $sgi}) < length($sseq) &&
+           $pident >= $pidentCutoff &&
+           $evalue <= $maxEval) {
+           $blastResultsHash{$sscinames . " " . $sgi} = $sseq;
         }
-    } elsif($pident >= $pidentCutoff && $length >= $blMinLen) {
+    } elsif($pident >= $pidentCutoff && 
+	    $length >= $blMinLen &&
+	    $evalue <= $maxEval) {
         $blastResultsHash{$sscinames . " " . $sgi} = $sseq;
     }
 }
@@ -275,17 +281,17 @@ if($clustalo) {
 	print STDERR "Combining original fasta sequences and blast result sequences and aligning using clustalo\n";
     }
     $alignCommand = "clustalo" . " --threads " . $p . " -i " . $outDir . "allSeqs.fasta" . " --out " . $outDir . "allSeqsAligned.fasta";
-} elsif($mafft) {
-    if($verbose) {
-	print STDERR "Combining original fasta sequences and blast result sequences and aligning using mafft\n";
-    }
-    $alignCommand = "mafft --adjustdirectionaccurately --globalpair --thread " . $p . " " . $outDir . "allSeqs.fasta > " . $outDir."allSeqsAligned.fasta";
-
-} else {
+} elsif($kalign) {
     if($verbose) {
 	print STDERR "Combining original fasta sequences and blast result sequences and aligning using kalign\n";
     }
     $alignCommand = "kalign -i " . $outDir . "allSeqs.fasta" . " -o " . $outDir . "allSeqsAligned.fasta";
+} else {
+    if($verbose) {
+	print STDERR "Combining original fasta sequences and blast result sequences and aligning using mafft\n";
+    }
+    # Made mafft the default because of the ability to adjust the direction of the sequences
+    $alignCommand = "mafft --adjustdirectionaccurately --globalpair --thread " . $p . " " . $outDir . "allSeqs.fasta > " . $outDir."allSeqsAligned.fasta";
 }
 my $doit = `$alignCommand`;
 
@@ -316,7 +322,8 @@ while(my $input = <ALIGN>) {
     $header =~ s/\s/_/;                 # replace genus species with genus_species
     $header =~ s/\s.+//;                # remove the rest of the crap in species name (isolate, etc..)
     my $sequence = join("", @sequences);
-    $sequence =~ s/[YRWSKMDVHBN]/-/g;   # replace ambiguous bases with a space
+    $sequence = uc($sequence);
+    $sequence =~ s/[YRWSKMDVHBN]/-/g;   # replace ambiguous bases with a dash
     for(my $i = 0; $i < length($sequence); $i++) {
         my $base = substr($sequence, $i,1);
         $alignmentHash{$i}{$header}{$base}++;
@@ -428,7 +435,7 @@ if($verbose) {
     This script takes in an organism name (any scientific taxon) and a gene (or other genetic element) name.
     The script then downloads all the sequences for that query from the NCBI nt database. Those sequences are 
     then blasted against a local nt database to get any additional sequences matching the input organism. 
-    All sequences are then combined and aligned using kalign. The consensus sequence of the alignment is
+    All sequences are then combined and aligned using mafft. The consensus sequence of the alignment is
     then output as both a fasta and as a table of counts for each A/T/G/C at each position. 
 
     The dependancies for this program are:
@@ -441,15 +448,13 @@ if($verbose) {
     Be sure the $BLASTDB system variable is set to point to the directory containing the taxdb 
     database. This is done by export BLASTDB='absolute/path/to/your/blastdb/'
 
-=item B<kalign>
+=item B<mafft>
 
-  kalign: kalign is used to align the sequences obtained and needs to be in your $PATH
+  mafft: mafft is used to align the sequences obtained and needs to be in your $PATH
 
 =back
 
-    I need to write an explanation of what the output files are.
-
-
+    
     The options used by this program are:
 
 =over 4
@@ -486,6 +491,10 @@ if($verbose) {
 =item B<--blastHitCount> (10)
 
     Number of blast hits to retrieve per sequence retrieved from NCBI.
+
+=item B<--maxEval> (0.001)
+
+    Maximum e-value to be included in blast results
 
 =item B<--processors> (1)
 
