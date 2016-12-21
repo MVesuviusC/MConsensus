@@ -61,6 +61,7 @@ pod2usage(2) && exit if ($help);
 my $nucSearch = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=nuccore&retmode=json";
 my @tempFiles;
 my @giArray;
+my %annotHash;
 my $efetch = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&rettype=fasta&retmode=text&id=";
 my $blastOutfmt = "-outfmt \"6 sgi staxids length pident evalue bitscore sseq\"";
 my $giRetrieveNum = 1;
@@ -146,6 +147,7 @@ if(scalar(@giArray) == 0) {
     print STDERR "No sequences retrieved from NCBI. Please check your search terms at http://www.ncbi.nlm.nih.gov/nuccore/\n";
     die;
 }
+close GITXT;
 
 ##############################
 ### Get fasta seqeunces for originalGis.txt and make tempdir/(originalGis.fasta)
@@ -159,6 +161,85 @@ push @tempFiles, $outDir."originalGis.fasta";
 if($verbose) {
     print STDERR "Fasta sequences downloaded and written to ", $outDir."originalGis.fasta\n\n";
 }
+close GIFASTAS;
+
+##############################
+### Get annotation for original sequences
+my $annotCommand = "GET \"eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&rettype=ft&retmode=text&id=" . join(',', @giArray) . "&email=". $email . "\"";
+my $annotResponse = `$annotCommand`;
+open (GIANNOT, ">", $outDir."originalGisAnnot.txt") or die "Cannot create originalGisAnnot.txt, check permissions\n";
+print GIANNOT $annotResponse, "\n";
+push @tempFiles, $outDir."originalGisAnnot.fasta";
+if($verbose) {
+    print STDERR "Annotations downloaded and written to ", $outDir."originalGisAnnot.txt\n\n";
+}
+close GIANNOT;
+##############################
+### Use annotation to modify fasta files to start at CYTB
+
+$/ = "\n";
+open (GIANNOT, "<", $outDir."originalGisAnnot.txt") or die "Cannot open originalGisAnnot.txt.\n";
+my $lastline;
+my $header;
+while(my $input = <GIANNOT>) {
+    chomp $input;
+#print substr($input, 0, 20), "\n";
+#if($input =~ /([0-9]+\t[0-9]+\tgene\n\t\t\tgene\tCYTB)/i) {
+#    if($input =~ /([0-9]+.+[0-9]+.+\n.+cytb)/i) {
+    if($input =~ /^>/) {
+        $header = $input;
+        $header =~ s/\|$//;
+        $header =~ s/.+\|//;
+	#print $header, "\n";
+    }
+    if($input =~ /gene.*\tcytb/i) {
+	#my $out = $1;
+	#print $out, "\n";
+	#my $header = $input;
+	#$header =~ s/\n.+//g;
+	#$header =~ s/\n//;
+	#$header =~ s/\|$//;
+	#$header =~ s/.+\|//;
+	
+        #$out =~ s/\t\t\t/\t/g;
+	#$out =~ s/\t.+//g;
+	#$out =~ s/\n//g;
+        #my ($number, undef) = split "\n", $out;
+        my ($number, undef) = split "\t", $lastline;
+        $annotHash{$header} = $number;	# make hash of positions $hash{header} = pos;
+        #print $header, "\t", $number, "\t", $lastline, "\n", $input, "\n";
+    #print $out, "\n";
+    }
+$lastline = $input;
+}
+close GIANNOT;
+
+##############################
+### Use hash of positions to pull in each fasta entry and rearrange it, then print out fixed fasta
+$/ = "\n>";
+open (GIFASTA, "<", $outDir."originalGis.fasta") or die "Cannot open originalGis.fasta.\n";
+open (GIFASTAFIXED, ">", $outDir."originalGisFixed.fasta") or die "Cannot open originalGisFixed.fasta.\n";
+my $badCount = 0;
+while(my $input = <GIFASTA>) {
+    chomp $input;
+    my ($header, @sequence) = split "\n", $input;
+    $header =~ s/>//;
+    $header =~ s/\s.+//;
+    if(defined($annotHash{$header})) {
+        my $seq = join("", @sequence);
+        $seq =~ s/[\t\s]//g;
+        my $fixedSeq = substr($seq, $annotHash{$header} - 1) . substr($seq, 0, $annotHash{$header} - 1);
+	print GIFASTAFIXED ">", $header, "\n", $fixedSeq, "\n";
+    } else {
+	$badCount++;
+    }
+}
+if($verbose && $badCount > 0) {
+    print STDERR "A total of ", $badCount, " fasta annotations could not be parsed\n";
+}
+close GIFASTA;
+close GIFASTAFIXED;
+$/ = "\n";
 
 
 ##############################
@@ -200,7 +281,7 @@ push @tempFiles, $outDir."organismGis.txt";
 if($verbose) {
     print STDERR scalar(@orgGiArray), " gis parsed and written to ", $outDir."organismGis.txt", "\n\n";
 }
-
+close ORGGITXT;
 
 ############################
 ### Blast originalGis.fasta against taxaDb and write out tempdir/blastResults.txt
@@ -213,11 +294,11 @@ if($verbose) {
 
 if(scalar(@giArray) > 0) {
     if($verbose) {
-     print STDERR "Blasting originalGis.fasta against ", $blastDb, "\n";
+     print STDERR "Blasting originalGisFixed.fasta against ", $blastDb, "\n";
     }
     system("blastn", 
         "-gilist", $outDir."organismGis.txt", 
-        "-query", $outDir."originalGis.fasta", 
+        "-query", $outDir."originalGisFixed.fasta", 
         "-db", $blastDb,  
         "-out", $outDir."blastResults.txt",
         "-outfmt", "6 sgi staxids length pident evalue bitscore sscinames sseq",
@@ -248,7 +329,7 @@ while(my $blastInput = <BLASTRESULTS>){
     chomp $blastInput;
     my ($sgi, $staxids, $length, $pident, $evalue, $bitscore, $sscinames, $sseq) = split "\t", $blastInput;
     $sseq =~ s/-//g; # get rid of insertions in the alignment
-    if(exists($blastResultsHash{$sscinames})){
+    if(exists($blastResultsHash{$sscinames . " " . $sgi})){
         if(length($blastResultsHash{$sscinames . " " . $sgi}) < length($sseq) &&
            $pident >= $pidentCutoff &&
            $evalue <= $maxEval) {
@@ -260,6 +341,7 @@ while(my $blastInput = <BLASTRESULTS>){
         $blastResultsHash{$sscinames . " " . $sgi} = $sseq;
     }
 }
+close BLASTRESULTS;
 
 open (BLASTFASTA, ">", $outDir."blastFasta.fasta") or die "Cannot write to blastFasta.fasta\n";
 for my $header (keys %blastResultsHash) {
@@ -268,11 +350,12 @@ for my $header (keys %blastResultsHash) {
 if($verbose) {
     print STDERR "Blast results parsed. Output written to ", $outDir."blastFasta.fasta\n\n";
 }
+close BLASTFASTA;
 
 ############################
 ### Align blastResults.fasta and originalGis.fasta (aligned.aln)
 
-system("cat " . $outDir . "blastFasta.fasta " . $outDir . "originalGis.fasta > " . $outDir . "allSeqs.fasta");
+system("cat " . $outDir . "blastFasta.fasta " . $outDir . "originalGisFixed.fasta > " . $outDir . "allSeqs.fasta");
 my $alignCommand;
 
 if($clustalo) {
@@ -333,6 +416,7 @@ while(my $input = <ALIGN>) {
         print STDERR $seqCount,"\r";
     }
 }
+close ALIGN;
 $/  = "\n"; # change input delimiter back
 
 open (CONSENSUSFILE, ">", $outDir . "Consensus.fasta") or die "Cannot write to consensus output file\n";
@@ -396,6 +480,7 @@ for my $baseNum ( sort {$a <=> $b} keys %alignmentHash) {
 
 print CONSENSUSFILE "\n";
 print STDERR "\n";
+close CONSENSUSFILE;
 
 if($verbose) {
     @speciesList = sort(@speciesList);
