@@ -183,32 +183,19 @@ my $lastline;
 my $header;
 while(my $input = <GIANNOT>) {
     chomp $input;
-#print substr($input, 0, 20), "\n";
-#if($input =~ /([0-9]+\t[0-9]+\tgene\n\t\t\tgene\tCYTB)/i) {
-#    if($input =~ /([0-9]+.+[0-9]+.+\n.+cytb)/i) {
     if($input =~ /^>/) {
         $header = $input;
         $header =~ s/\|$//;
         $header =~ s/.+\|//;
 	#print $header, "\n";
     }
-    if($input =~ /gene.*\tcytb/i) {
-	#my $out = $1;
-	#print $out, "\n";
-	#my $header = $input;
-	#$header =~ s/\n.+//g;
-	#$header =~ s/\n//;
-	#$header =~ s/\|$//;
-	#$header =~ s/.+\|//;
-	
-        #$out =~ s/\t\t\t/\t/g;
-	#$out =~ s/\t.+//g;
-	#$out =~ s/\n//g;
-        #my ($number, undef) = split "\n", $out;
+    if($input =~ /gene.*\tcytb/i || $input =~ /gene.*\tcob/i && $lastline =~ /[0-9]+\t[0-9]+\tgene/i) {
         my ($number, undef) = split "\t", $lastline;
         $annotHash{$header} = $number;	# make hash of positions $hash{header} = pos;
-        #print $header, "\t", $number, "\t", $lastline, "\n", $input, "\n";
-    #print $out, "\n";
+    
+	if($number eq "") {
+	    print STDERR $header, "\t", $lastline, "\n";
+	}
     }
 $lastline = $input;
 }
@@ -219,26 +206,32 @@ close GIANNOT;
 $/ = "\n>";
 open (GIFASTA, "<", $outDir."originalGis.fasta") or die "Cannot open originalGis.fasta.\n";
 open (GIFASTAFIXED, ">", $outDir."originalGisFixed.fasta") or die "Cannot open originalGisFixed.fasta.\n";
+open (BADANNOT, ">", $outDir . "badAnnots.txt") or die "Cannot write to badAnnots.txt";
 my $badCount = 0;
 while(my $input = <GIFASTA>) {
     chomp $input;
     my ($header, @sequence) = split "\n", $input;
     $header =~ s/>//;
-    $header =~ s/\s.+//;
-    if(defined($annotHash{$header})) {
+#print STDERR $header, "\n";
+    my $shortHeader = $header;
+    $shortHeader =~ s/>//;
+    $shortHeader =~ s/\s.+//;
+    if(defined($annotHash{$shortHeader})) {
         my $seq = join("", @sequence);
         $seq =~ s/[\t\s]//g;
-        my $fixedSeq = substr($seq, $annotHash{$header} - 1) . substr($seq, 0, $annotHash{$header} - 1);
+        my $fixedSeq = substr($seq, $annotHash{$shortHeader} - 1) . substr($seq, 0, $annotHash{$shortHeader} - 1);
 	print GIFASTAFIXED ">", $header, "\n", $fixedSeq, "\n";
     } else {
 	$badCount++;
+	print BADANNOT $header, "\n";
     }
 }
 if($verbose && $badCount > 0) {
-    print STDERR "A total of ", $badCount, " fasta annotations could not be parsed\n";
+    print STDERR "A total of ", $badCount, " fasta annotations could not be parsed\nHeaders written to badAnnots.txt\n";
 }
 close GIFASTA;
 close GIFASTAFIXED;
+close BADANNOT;
 $/ = "\n";
 
 
@@ -246,42 +239,42 @@ $/ = "\n";
 ### Generate list of gis for $organism to use in blast search
 ### Report how long it took
 
-my $giSearch = "GET \"" . $nucSearch . "&retmax=100000" . "&email=" . $email . "&term=(" . $organism . "[Organism]" . ")\"";
-if($verbose) {
-    print STDERR "Retrieving list of gis matching ", $organism, " from: ", $giSearch, "\n";
-    print STDERR "Retrieving batch #", $giRetrieveNum, " from ncbi.\n";
-}
-my $giResponse = `$giSearch`;
+#my $giSearch = "GET \"" . $nucSearch . "&retmax=100000" . "&email=" . $email . "&term=(" . $organism . "[Organism]" . ")\"";
+#if($verbose) {
+#    print STDERR "Retrieving list of gis matching ", $organism, " from: ", $giSearch, "\n";
+#    print STDERR "Retrieving batch #", $giRetrieveNum, " from ncbi.\n";
+#}
+#my $giResponse = `$giSearch`;
 
-$giResponse =~ s/[\n\s\"]//g;
+#$giResponse =~ s/[\n\s\"]//g;
 # get rid of everything up to the id list
-$giResponse =~ s/.+idlist:\[//; 
-$giResponse =~ s/].+//;
-my @orgGiArray = split ",", $giResponse;
+#$giResponse =~ s/.+idlist:\[//; 
+#$giResponse =~ s/].+//;
+#my @orgGiArray = split ",", $giResponse;
 
-while(scalar(@orgGiArray % 100000 == 0)) {
-    if($verbose) {
-        print STDERR "Retrieving batch #", $giRetrieveNum + 1, " from ncbi.\n";
-    }
+#while(scalar(@orgGiArray % 100000 == 0)) {
+#    if($verbose) {
+#        print STDERR "Retrieving batch #", $giRetrieveNum + 1, " from ncbi.\n";
+#    }
 # get more gis, starting after the first 100,000
-    $giSearch = "GET \"" . $nucSearch . "&retmax=100000&retstart=" . $giRetrieveNum * 100000 . "&email=" . $email . "&term=(" . $organism . "[Organism]" . ")\"";
-$giResponse = `$giSearch`;
-    $giResponse =~ s/[\n\s\"]//g;
-    # get rid of everything up to the id list
-    $giResponse =~ s/.+idlist:\[//; 
-    $giResponse =~ s/].+//;
-    my @tempGiArray = split ",", $giResponse;
-    push @orgGiArray, @tempGiArray; 
-    $giRetrieveNum++;
-}
+#    $giSearch = "GET \"" . $nucSearch . "&retmax=100000&retstart=" . $giRetrieveNum * 100000 . "&email=" . $email . "&term=(" . $organism . "[Organism]" . ")\"";
+#$giResponse = `$giSearch`;
+#    $giResponse =~ s/[\n\s\"]//g;
+#    # get rid of everything up to the id list
+#    $giResponse =~ s/.+idlist:\[//; 
+#    $giResponse =~ s/].+//;
+#    my @tempGiArray = split ",", $giResponse;
+#    push @orgGiArray, @tempGiArray; 
+#    $giRetrieveNum++;
+#}
 
-open (ORGGITXT, ">", $outDir."organismGis.txt") or die "Cannot create organismGis.txt, check permissions\n";
-print ORGGITXT join("\n", @orgGiArray), "\n";
-push @tempFiles, $outDir."organismGis.txt";
-if($verbose) {
-    print STDERR scalar(@orgGiArray), " gis parsed and written to ", $outDir."organismGis.txt", "\n\n";
-}
-close ORGGITXT;
+#open (ORGGITXT, ">", $outDir."organismGis.txt") or die "Cannot create organismGis.txt, check permissions\n";
+#print ORGGITXT join("\n", @orgGiArray), "\n";
+#push @tempFiles, $outDir."organismGis.txt";
+#if($verbose) {
+#    print STDERR scalar(@orgGiArray), " gis parsed and written to ", $outDir."organismGis.txt", "\n\n";
+#}
+#close ORGGITXT;
 
 ############################
 ### Blast originalGis.fasta against taxaDb and write out tempdir/blastResults.txt
@@ -292,25 +285,25 @@ close ORGGITXT;
 ###         bit score(bitscore), scientific name(sscinames), aligned portion of subject(sseq)
 ### Report how long it took 
 
-if(scalar(@giArray) > 0) {
-    if($verbose) {
-     print STDERR "Blasting originalGisFixed.fasta against ", $blastDb, "\n";
-    }
-    system("blastn", 
-        "-gilist", $outDir."organismGis.txt", 
-        "-query", $outDir."originalGisFixed.fasta", 
-        "-db", $blastDb,  
-        "-out", $outDir."blastResults.txt",
-        "-outfmt", "6 sgi staxids length pident evalue bitscore sscinames sseq",
-        "-num_threads", $p, 
-        "-num_alignments", $blastHitCount );
-    if($verbose) {
-     print STDERR "Blast finished.Output written to ",$outDir."blastResults.txt", "\n\n";
-    }
-} else {
-    print STDERR "No sequences matching search terms retrieved.\nCheck search terms at https://www.ncbi.nlm.nih.gov/nuccore/\n";
-    die;
-}
+#if(scalar(@giArray) > 0) {
+#    if($verbose) {
+#     print STDERR "Blasting originalGisFixed.fasta against ", $blastDb, "\n";
+#    }
+#    system("blastn", 
+#        "-gilist", $outDir."organismGis.txt", 
+#        "-query", $outDir."originalGisFixed.fasta", 
+#        "-db", $blastDb,  
+#        "-out", $outDir."blastResults.txt",
+#        "-outfmt", "6 sgi staxids length pident evalue bitscore sscinames sseq",
+#        "-num_threads", $p, 
+#        "-num_alignments", $blastHitCount );
+#    if($verbose) {
+#     print STDERR "Blast finished.Output written to ",$outDir."blastResults.txt", "\n\n";
+#    }
+#} else {
+#    print STDERR "No sequences matching search terms retrieved.\nCheck search terms at https://www.ncbi.nlm.nih.gov/nuccore/\n";
+#    die;
+#}
 
 
 ############################
@@ -321,41 +314,41 @@ if(scalar(@giArray) > 0) {
 
 # What about two blast hits that hit different parts of the query, but are from the same species?
 
-if($verbose) {
-    print STDERR "Parsing blast results\n";
-}
-open (BLASTRESULTS, "<", $outDir."blastResults.txt") or die "Cannot open blastResults.txt\n";
-while(my $blastInput = <BLASTRESULTS>){
-    chomp $blastInput;
-    my ($sgi, $staxids, $length, $pident, $evalue, $bitscore, $sscinames, $sseq) = split "\t", $blastInput;
-    $sseq =~ s/-//g; # get rid of insertions in the alignment
-    if(exists($blastResultsHash{$sscinames . " " . $sgi})){
-        if(length($blastResultsHash{$sscinames . " " . $sgi}) < length($sseq) &&
-           $pident >= $pidentCutoff &&
-           $evalue <= $maxEval) {
-           $blastResultsHash{$sscinames . " " . $sgi} = $sseq;
-        }
-    } elsif($pident >= $pidentCutoff && 
-	    $length >= $blMinLen &&
-	    $evalue <= $maxEval) {
-        $blastResultsHash{$sscinames . " " . $sgi} = $sseq;
-    }
-}
-close BLASTRESULTS;
+#if($verbose) {
+#    print STDERR "Parsing blast results\n";
+#}
+#open (BLASTRESULTS, "<", $outDir."blastResults.txt") or die "Cannot open blastResults.txt\n";
+#while(my $blastInput = <BLASTRESULTS>){
+#    chomp $blastInput;
+#    my ($sgi, $staxids, $length, $pident, $evalue, $bitscore, $sscinames, $sseq) = split "\t", $blastInput;
+#    $sseq =~ s/-//g; # get rid of insertions in the alignment
+#    if(exists($blastResultsHash{$sscinames . " " . $sgi})){
+#        if(length($blastResultsHash{$sscinames . " " . $sgi}) < length($sseq) &&
+#           $pident >= $pidentCutoff &&
+#           $evalue <= $maxEval) {
+#           $blastResultsHash{$sscinames . " " . $sgi} = $sseq;
+#        }
+#    } elsif($pident >= $pidentCutoff && 
+#	    $length >= $blMinLen &&
+#	    $evalue <= $maxEval) {
+#        $blastResultsHash{$sscinames . " " . $sgi} = $sseq;
+#    }
+#}
+#close BLASTRESULTS;
 
-open (BLASTFASTA, ">", $outDir."blastFasta.fasta") or die "Cannot write to blastFasta.fasta\n";
-for my $header (keys %blastResultsHash) {
-    print BLASTFASTA ">", $header, "\n", $blastResultsHash{$header}, "\n";
-}
-if($verbose) {
-    print STDERR "Blast results parsed. Output written to ", $outDir."blastFasta.fasta\n\n";
-}
-close BLASTFASTA;
+#open (BLASTFASTA, ">", $outDir."blastFasta.fasta") or die "Cannot write to blastFasta.fasta\n";
+#for my $header (keys %blastResultsHash) {
+#    print BLASTFASTA ">", $header, "\n", $blastResultsHash{$header}, "\n";
+#}
+#if($verbose) {
+#    print STDERR "Blast results parsed. Output written to ", $outDir."blastFasta.fasta\n\n";
+#}
+#close BLASTFASTA;
 
 ############################
 ### Align blastResults.fasta and originalGis.fasta (aligned.aln)
 
-system("cat " . $outDir . "blastFasta.fasta " . $outDir . "originalGisFixed.fasta > " . $outDir . "allSeqs.fasta");
+#system("cat " . $outDir . "blastFasta.fasta " . $outDir . "originalGisFixed.fasta > " . $outDir . "allSeqs.fasta");
 my $alignCommand;
 
 if($clustalo) {
@@ -374,7 +367,8 @@ if($clustalo) {
 	print STDERR "Combining original fasta sequences and blast result sequences and aligning using mafft\n";
     }
     # Made mafft the default because of the ability to adjust the direction of the sequences
-    $alignCommand = "mafft --adjustdirectionaccurately --globalpair --thread " . $p . " " . $outDir . "allSeqs.fasta > " . $outDir."allSeqsAligned.fasta";
+    #$alignCommand = "mafft --adjustdirectionaccurately --globalpair --thread " . $p . " " . $outDir . "allSeqs.fasta > " . $outDir."allSeqsAligned.fasta";
+    $alignCommand = "mafft --adjustdirectionaccurately --globalpair --thread " . $p . " " . $outDir . "originalGisFixed.fasta> " . $outDir."allSeqsAligned.fasta";
 }
 my $doit = `$alignCommand`;
 
@@ -399,9 +393,9 @@ open (ALIGN, "<", $outDir . "allSeqsAligned.fasta") or die "Cannot open input fi
 while(my $input = <ALIGN>) {
     chomp $input;
     my($header, @sequences) = split "\n", $input;
-    $header =~ s/^>//;                  # remove first ">"
-    $header =~ s/^[0-9]+//;             # remove gi info from original gis
-    $header =~ s/^gi.+\|\s//;           # get rid of gi info
+    $header =~ s/^.+?\s//;                  # remove first ">"
+    #$header =~ s/^[0-9]+//;             # remove gi info from original gis
+    #$header =~ s/^gi.+\|\s//;           # get rid of gi info
     $header =~ s/\s/_/;                 # replace genus species with genus_species
     $header =~ s/\s.+//;                # remove the rest of the crap in species name (isolate, etc..)
     my $sequence = join("", @sequences);
@@ -416,6 +410,7 @@ while(my $input = <ALIGN>) {
         print STDERR $seqCount,"\r";
     }
 }
+
 close ALIGN;
 $/  = "\n"; # change input delimiter back
 
