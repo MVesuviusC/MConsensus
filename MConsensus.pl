@@ -104,6 +104,7 @@ if($outDir eq "") {
       $outDir .= "/";
 }
 mkdir $outDir;
+mkdir $outDir . "bowtieIndex";
 if($verbose) {
     print STDERR "Output directory: ", $outDir, "\n\n";
 }
@@ -148,7 +149,7 @@ if(scalar(@giArray) == 0) {
 }
 
 ##############################
-### Get fasta seqeunces for originalGis.txt and make tempdir/(originalGis.fasta)
+### Get fasta seqeunces for originalGis.txt and make $outdir/(originalGis.fasta)
 ### Include email in web query
 ### Report how long it took
 my $command = "GET \"$efetch" . join(',', @giArray) . "&email=". $email . ")\"";
@@ -160,6 +161,56 @@ if($verbose) {
     print STDERR "Fasta sequences downloaded and written to ", $outDir."originalGis.fasta\n\n";
 }
 
+
+
+##############################
+### Pull in fasta entries and output fasta entries with 200bp fragments
+open (GIFRAGMENTS, ">", $outDir . "originalGiFragments.fasta") or die "Cannot create originaGiFragments.fasta, check permissions\n";
+my @fastas = split "\n>", $seqResponse;
+for my $entry (@fastas) {
+    my ($header, @sequence) = split "\n", $entry;
+    $header =~ s/.+?\s//;
+    $header =~ s/\s/_/;
+    $header =~ s/\s.+//;
+    $header =~ s/>//;
+print STDERR "X", $header, "X\n";
+    my $seq = join("", @sequence);
+    $seq =~ s/[\s\t]//g;
+    my $shortSeq;
+    while(length($seq) > 1000) {
+	#my $rand = int(rand(30000));
+        $shortSeq = substr($seq, 0, 1000);
+	$seq = substr($seq, 1000);
+	print GIFRAGMENTS ">", $header. "\n", $shortSeq, "\n";
+    }
+    print GIFRAGMENTS ">", $header, "\n", $shortSeq, "\n";
+}
+
+
+##############################
+### Align fragments with bowtie2 
+
+# get first fasta entry and make bowtie index
+my $firstFastaCommand = "perl -pe \"s/\\n/\\*/g\" " . $outDir . "originalGis.fasta | perl -pe \"s/\\*>.+//\" | perl -pe \"s/\\*/\\n/g\" > " . $outDir . "bowtieIndex/firstFasta.fasta";
+system($firstFastaCommand);
+
+my $btBuildCommand = "bowtie2-build " . $outDir . "bowtieIndex/firstFasta.fasta " . $outDir . "bowtieIndex/firstFasta";
+my $dobtbuild = `$btBuildCommand`;
+if($verbose) {
+    #print STDERR $dobtbuild, "\n";
+}
+
+# Run Bowtie
+
+my $btCommand = "bowtie2 --mp 2 --very-sensitive -N 1 -L 20 -f -x " . 
+    $outDir . "bowtieIndex/firstFasta -U " . 
+    $outDir . "originalGiFragments.fasta -S " .
+    $outDir . "originalGiFragmentsAligned.sam";
+
+my $dobtRun = `$btCommand`;
+
+print STDERR $dobtRun, "\n";
+die;
 
 ##############################
 ### Generate list of gis for $organism to use in blast search
