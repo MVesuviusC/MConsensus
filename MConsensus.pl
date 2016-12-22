@@ -21,6 +21,8 @@ my $retmax = 1000;
 my $organism = "salamanders";
 my $gene = "mitochondrion+\"complete+genome\"";
 my $email = "matthewvc1\@gmail.com";
+my $geneNameToMatch = "gene\tcytb,gene\tcob";
+my $geneType = "gene";
 my $outDir = "";
 my $blastDb = "nt";
 my $blastHitCount = 10;
@@ -38,6 +40,8 @@ GetOptions ("retmax=i"          => \$retmax,
             "organism=s"        => \$organism,
             "gene=s"            => \$gene,
             "email=s"           => \$email,
+	    "geneNameToMatch=s" => \$geneNameToMatch,
+	    "geneType=s"        => \$geneType,
             "outDir=s"          => \$outDir,
             "blastDb=s"         => \$blastDb,
             "blastHitCount=i"   => \$blastHitCount,
@@ -171,7 +175,7 @@ open (GIANNOT, ">", $outDir."originalGisAnnot.txt") or die "Cannot create origin
 print GIANNOT $annotResponse, "\n";
 push @tempFiles, $outDir."originalGisAnnot.fasta";
 if($verbose) {
-    print STDERR "Annotations downloaded and written to ", $outDir."originalGisAnnot.txt\n\n";
+    print STDERR "Annotations downloaded and written to ", $outDir."originalGisAnnot.txt using $annotCommand\n\n";
 }
 close GIANNOT;
 ##############################
@@ -181,6 +185,11 @@ $/ = "\n";
 open (GIANNOT, "<", $outDir."originalGisAnnot.txt") or die "Cannot open originalGisAnnot.txt.\n";
 my $lastline;
 my $header;
+
+my @matchGenes = split ",", $geneNameToMatch;
+my $geneMatch = join("|", @matchGenes);
+print STDERR $geneMatch, "\n";
+
 while(my $input = <GIANNOT>) {
     chomp $input;
     if($input =~ /^>/) {
@@ -189,9 +198,12 @@ while(my $input = <GIANNOT>) {
         $header =~ s/.+\|//;
 	#print $header, "\n";
     }
-    if($input =~ /gene.*\tcytb/i || $input =~ /gene.*\tcob/i && $lastline =~ /[0-9]+\t[0-9]+\tgene/i) {
-        my ($number, undef) = split "\t", $lastline;
-        $annotHash{$header} = $number;	# make hash of positions $hash{header} = pos;
+    #if($input =~ /gene.*\tcytb/i || $input =~ /gene.*\tcob/i && $lastline =~ /[0-9]+\t[0-9]+\tgene/i) {
+    #my $geneMatch = "gene.*\tcytb|gene.*\tcob";
+    #if($input =~ /gene.*\tcytb|gene.*\tcob/i && $lastline =~ /[0-9]+\t[0-9]+\tgene/i){
+    if($input =~ /$geneMatch/i && $lastline =~ /[0-9]+\t[0-9]+\t$geneType/i){
+        my ($number, $number2, undef) = split "\t", $lastline;
+	$annotHash{$header} = $number . "\t" . $number2;	# make hash of positions $hash{header} = pos;
     
 	if($number eq "") {
 	    print STDERR $header, "\t", $lastline, "\n";
@@ -212,14 +224,14 @@ while(my $input = <GIFASTA>) {
     chomp $input;
     my ($header, @sequence) = split "\n", $input;
     $header =~ s/>//;
-#print STDERR $header, "\n";
     my $shortHeader = $header;
     $shortHeader =~ s/>//;
     $shortHeader =~ s/\s.+//;
     if(defined($annotHash{$shortHeader})) {
+	my ($end, $start) = split "\t", $annotHash{$shortHeader};
         my $seq = join("", @sequence);
         $seq =~ s/[\t\s]//g;
-        my $fixedSeq = substr($seq, $annotHash{$shortHeader} - 1) . substr($seq, 0, $annotHash{$shortHeader} - 1);
+        my $fixedSeq = substr($seq, $start, abs($end - $start));
 	print GIFASTAFIXED ">", $header, "\n", $fixedSeq, "\n";
     } else {
 	$badCount++;
@@ -227,123 +239,14 @@ while(my $input = <GIFASTA>) {
     }
 }
 if($verbose && $badCount > 0) {
-    print STDERR "A total of ", $badCount, " fasta annotations could not be parsed\nHeaders written to badAnnots.txt\n";
+    print STDERR "A total of ", $badCount, " fasta annotations could not be parsed\nHeaders written to badAnnots.txt\n\n";
+} elsif($verbose) {
+    print STDERR "All of your entries could be parsed. Amazing!\n\n";
 }
 close GIFASTA;
 close GIFASTAFIXED;
 close BADANNOT;
 $/ = "\n";
-
-
-##############################
-### Generate list of gis for $organism to use in blast search
-### Report how long it took
-
-#my $giSearch = "GET \"" . $nucSearch . "&retmax=100000" . "&email=" . $email . "&term=(" . $organism . "[Organism]" . ")\"";
-#if($verbose) {
-#    print STDERR "Retrieving list of gis matching ", $organism, " from: ", $giSearch, "\n";
-#    print STDERR "Retrieving batch #", $giRetrieveNum, " from ncbi.\n";
-#}
-#my $giResponse = `$giSearch`;
-
-#$giResponse =~ s/[\n\s\"]//g;
-# get rid of everything up to the id list
-#$giResponse =~ s/.+idlist:\[//; 
-#$giResponse =~ s/].+//;
-#my @orgGiArray = split ",", $giResponse;
-
-#while(scalar(@orgGiArray % 100000 == 0)) {
-#    if($verbose) {
-#        print STDERR "Retrieving batch #", $giRetrieveNum + 1, " from ncbi.\n";
-#    }
-# get more gis, starting after the first 100,000
-#    $giSearch = "GET \"" . $nucSearch . "&retmax=100000&retstart=" . $giRetrieveNum * 100000 . "&email=" . $email . "&term=(" . $organism . "[Organism]" . ")\"";
-#$giResponse = `$giSearch`;
-#    $giResponse =~ s/[\n\s\"]//g;
-#    # get rid of everything up to the id list
-#    $giResponse =~ s/.+idlist:\[//; 
-#    $giResponse =~ s/].+//;
-#    my @tempGiArray = split ",", $giResponse;
-#    push @orgGiArray, @tempGiArray; 
-#    $giRetrieveNum++;
-#}
-
-#open (ORGGITXT, ">", $outDir."organismGis.txt") or die "Cannot create organismGis.txt, check permissions\n";
-#print ORGGITXT join("\n", @orgGiArray), "\n";
-#push @tempFiles, $outDir."organismGis.txt";
-#if($verbose) {
-#    print STDERR scalar(@orgGiArray), " gis parsed and written to ", $outDir."organismGis.txt", "\n\n";
-#}
-#close ORGGITXT;
-
-############################
-### Blast originalGis.fasta against taxaDb and write out tempdir/blastResults.txt
-### Keep $blastHitCount hits per query
-### blastResults.txt should use outfmt 6 with columns:
-###       - gi(sgi), taxaInfo(staxids), alignment length(length), 
-###         percent identical matches(pident), evalue(evalue), 
-###         bit score(bitscore), scientific name(sscinames), aligned portion of subject(sseq)
-### Report how long it took 
-
-#if(scalar(@giArray) > 0) {
-#    if($verbose) {
-#     print STDERR "Blasting originalGisFixed.fasta against ", $blastDb, "\n";
-#    }
-#    system("blastn", 
-#        "-gilist", $outDir."organismGis.txt", 
-#        "-query", $outDir."originalGisFixed.fasta", 
-#        "-db", $blastDb,  
-#        "-out", $outDir."blastResults.txt",
-#        "-outfmt", "6 sgi staxids length pident evalue bitscore sscinames sseq",
-#        "-num_threads", $p, 
-#        "-num_alignments", $blastHitCount );
-#    if($verbose) {
-#     print STDERR "Blast finished.Output written to ",$outDir."blastResults.txt", "\n\n";
-#    }
-#} else {
-#    print STDERR "No sequences matching search terms retrieved.\nCheck search terms at https://www.ncbi.nlm.nih.gov/nuccore/\n";
-#    die;
-#}
-
-
-############################
-### Parse blastResults.txt 
-###       - Keep one longest sequence per species
-###       - Cutoffs for minimum length and % identity
-### Write fasta file (blastResults.fasta) with sequence and header: >gi_species
-
-# What about two blast hits that hit different parts of the query, but are from the same species?
-
-#if($verbose) {
-#    print STDERR "Parsing blast results\n";
-#}
-#open (BLASTRESULTS, "<", $outDir."blastResults.txt") or die "Cannot open blastResults.txt\n";
-#while(my $blastInput = <BLASTRESULTS>){
-#    chomp $blastInput;
-#    my ($sgi, $staxids, $length, $pident, $evalue, $bitscore, $sscinames, $sseq) = split "\t", $blastInput;
-#    $sseq =~ s/-//g; # get rid of insertions in the alignment
-#    if(exists($blastResultsHash{$sscinames . " " . $sgi})){
-#        if(length($blastResultsHash{$sscinames . " " . $sgi}) < length($sseq) &&
-#           $pident >= $pidentCutoff &&
-#           $evalue <= $maxEval) {
-#           $blastResultsHash{$sscinames . " " . $sgi} = $sseq;
-#        }
-#    } elsif($pident >= $pidentCutoff && 
-#	    $length >= $blMinLen &&
-#	    $evalue <= $maxEval) {
-#        $blastResultsHash{$sscinames . " " . $sgi} = $sseq;
-#    }
-#}
-#close BLASTRESULTS;
-
-#open (BLASTFASTA, ">", $outDir."blastFasta.fasta") or die "Cannot write to blastFasta.fasta\n";
-#for my $header (keys %blastResultsHash) {
-#    print BLASTFASTA ">", $header, "\n", $blastResultsHash{$header}, "\n";
-#}
-#if($verbose) {
-#    print STDERR "Blast results parsed. Output written to ", $outDir."blastFasta.fasta\n\n";
-#}
-#close BLASTFASTA;
 
 ############################
 ### Align blastResults.fasta and originalGis.fasta (aligned.aln)
@@ -351,25 +254,17 @@ $/ = "\n";
 #system("cat " . $outDir . "blastFasta.fasta " . $outDir . "originalGisFixed.fasta > " . $outDir . "allSeqs.fasta");
 my $alignCommand;
 
-if($clustalo) {
-    # Clustalo was slower
-    if($verbose) {
-	print STDERR "Combining original fasta sequences and blast result sequences and aligning using clustalo\n";
-    }
-    $alignCommand = "clustalo" . " --threads " . $p . " -i " . $outDir . "allSeqs.fasta" . " --out " . $outDir . "allSeqsAligned.fasta";
-} elsif($kalign) {
-    if($verbose) {
-	print STDERR "Combining original fasta sequences and blast result sequences and aligning using kalign\n";
-    }
-    $alignCommand = "kalign -i " . $outDir . "allSeqs.fasta" . " -o " . $outDir . "allSeqsAligned.fasta";
-} else {
-    if($verbose) {
-	print STDERR "Combining original fasta sequences and blast result sequences and aligning using mafft\n";
-    }
-    # Made mafft the default because of the ability to adjust the direction of the sequences
-    #$alignCommand = "mafft --adjustdirectionaccurately --globalpair --thread " . $p . " " . $outDir . "allSeqs.fasta > " . $outDir."allSeqsAligned.fasta";
-    $alignCommand = "mafft --adjustdirectionaccurately --globalpair --thread " . $p . " " . $outDir . "originalGisFixed.fasta> " . $outDir."allSeqsAligned.fasta";
+
+if($verbose) {
+    print STDERR "Combining original fasta sequences and blast result sequences and aligning using mafft\n";
 }
+# Made mafft the default because of the ability to adjust the direction of the sequences
+#$alignCommand = "mafft --adjustdirectionaccurately --globalpair --thread " . $p . " " . $outDir . "allSeqs.fasta > " . $outDir."allSeqsAligned.fasta";
+$alignCommand = "mafft --quiet --adjustdirectionaccurately --globalpair --thread " . $p . " " . $outDir . "originalGisFixed.fasta > " . $outDir."allSeqsAligned.fasta";
+if($verbose) {
+    $alignCommand =~ s/mafft --quiet/mafft/;
+}
+
 my $doit = `$alignCommand`;
 
 if($verbose) {
