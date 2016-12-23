@@ -157,8 +157,14 @@ close GITXT;
 ### Get fasta seqeunces for originalGis.txt and make tempdir/(originalGis.fasta)
 ### Include email in web query
 ### Report how long it took
-my $command = "GET \"$efetch" . join(',', @giArray) . "&email=". $email . ")\"";
-my $seqResponse = `$command`;
+my $seqResponse;
+
+while(scalar(@giArray) > 200) {
+    my @currentGis = splice(@giArray, 0, 200);
+    my $command = "GET \"$efetch" . join(',', @giArray) . "&email=". $email . ")\"";
+    $seqResponse .= `$command`;
+}
+
 open (GIFASTAS, ">", $outDir."originalGis.fasta") or die "Cannot create originalGis.txt, check permissions\n";
 print GIFASTAS $seqResponse, "\n";
 push @tempFiles, $outDir."originalGis.fasta";
