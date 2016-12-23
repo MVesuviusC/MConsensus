@@ -158,12 +158,14 @@ close GITXT;
 ### Include email in web query
 ### Report how long it took
 my $seqResponse;
-
-while(scalar(@giArray) > 200) {
-    my @currentGis = splice(@giArray, 0, 200);
-    my $command = "GET \"$efetch" . join(',', @giArray) . "&email=". $email . ")\"";
+my @gisToGet = @giArray;
+while(scalar(@gisToGet) > 200) {
+    my @currentGis = splice(@gisToGet, 0, 200);
+    my $command = "GET \"$efetch" . join(',', @currentGis) . "&email=". $email . ")\"";
     $seqResponse .= `$command`;
 }
+my $command = "GET \"$efetch" . join(',', @gisToGet) . "&email=". $email . ")\"";
+$seqResponse .= `$command`;
 
 open (GIFASTAS, ">", $outDir."originalGis.fasta") or die "Cannot create originalGis.txt, check permissions\n";
 print GIFASTAS $seqResponse, "\n";
@@ -175,8 +177,17 @@ close GIFASTAS;
 
 ##############################
 ### Get annotation for original sequences
-my $annotCommand = "GET \"eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&rettype=ft&retmode=text&id=" . join(',', @giArray) . "&email=". $email . "\"";
-my $annotResponse = `$annotCommand`;
+@gisToGet = @giArray;
+my $annotResponse;
+my $annotCommand;
+while(scalar(@gisToGet) > 200) {
+    my @currentGis = splice(@gisToGet, 0, 200);
+    $annotCommand = "GET \"eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&rettype=ft&retmode=text&id=" . join(',', @currentGis) . "&email=". $email . "\"";
+    $annotResponse .= `$annotCommand`;
+}
+$annotCommand = "GET \"eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&rettype=ft&retmode=text&id=" . join(',', @gisToGet) . "&email=". $email . "\"";
+$annotResponse .= `$annotCommand`;
+
 open (GIANNOT, ">", $outDir."originalGisAnnot.txt") or die "Cannot create originalGisAnnot.txt, check permissions\n";
 print GIANNOT $annotResponse, "\n";
 push @tempFiles, $outDir."originalGisAnnot.fasta";
@@ -194,7 +205,6 @@ my $header;
 
 my @matchGenes = split ",", $geneNameToMatch;
 my $geneMatch = join("|", @matchGenes);
-print STDERR $geneMatch, "\n";
 
 while(my $input = <GIANNOT>) {
     chomp $input;
@@ -266,7 +276,7 @@ if($verbose) {
 }
 # Made mafft the default because of the ability to adjust the direction of the sequences
 #$alignCommand = "mafft --adjustdirectionaccurately --globalpair --thread " . $p . " " . $outDir . "allSeqs.fasta > " . $outDir."allSeqsAligned.fasta";
-$alignCommand = "mafft --quiet --adjustdirectionaccurately --globalpair --thread " . $p . " " . $outDir . "originalGisFixed.fasta > " . $outDir."allSeqsAligned.fasta";
+$alignCommand = "mafft --quiet --auto --adjustdirectionaccurately --globalpair --thread " . $p . " " . $outDir . "originalGisFixed.fasta > " . $outDir."allSeqsAligned.fasta";
 if($verbose) {
     $alignCommand =~ s/mafft --quiet/mafft/;
 }
@@ -318,7 +328,7 @@ $/  = "\n"; # change input delimiter back
 open (CONSENSUSFILE, ">", $outDir . "Consensus.fasta") or die "Cannot write to consensus output file\n";
 open (TABLEFILE, ">", $outDir . "ConsensusTable.txt") or die "Cannot write to consensus table output file\n";
 
-print TABLEFILE "Base\tA\tT\tG\tC\tConsensus\tMissing\n";
+print TABLEFILE "AlignmentBase\tA\tT\tG\tC\tConsensus\tMissing\n";
 print CONSENSUSFILE ">$organism\n";
 
 for my $baseNum ( sort {$a <=> $b} keys %alignmentHash) {
@@ -349,29 +359,33 @@ for my $baseNum ( sort {$a <=> $b} keys %alignmentHash) {
             $missingBase++;
         }
     }
-    print TABLEFILE $baseNum, "\t";
-    if($speciesCount > 0) {
-        my $countCutoff = ($minAf / 100) * $speciesCount; # minimum number of counts
-        for my $topBase (@baseArray) {
-            if(exists($currentBase{$topBase})) {
-                print TABLEFILE $currentBase{$topBase}, "\t";
-                if($currentBase{$topBase} >= $countCutoff) {
-                    $consensusBase .= $topBase;
-                }
-            } else {
-                print TABLEFILE "0\t";
-            }
-        }
-        if ( $consensusBase eq "" ) {   # If all bases are below the min %cutoff
-            $consensusBase = "N";
-        }
-        print TABLEFILE $ambiguityHash{$consensusBase}, "\t";
-    } else {
-        print TABLEFILE "0\t0\t0\t0\t";
-        $consensusBase = "N";
+    my $countCutoff = ($minAf / 100) * $speciesCount; # minimum number of counts
+    if($missingBase < $countCutoff) {  #keep only those bases that have info at more than $minAf % bases
+
+	print TABLEFILE $baseNum, "\t";
+	if($speciesCount > 0) {
+	    #my $countCutoff = ($minAf / 100) * $speciesCount; # minimum number of counts
+	    for my $topBase (@baseArray) {
+		if(exists($currentBase{$topBase})) {
+		    print TABLEFILE $currentBase{$topBase}, "\t";
+		    if($currentBase{$topBase} >= $countCutoff) {
+			$consensusBase .= $topBase;
+		    }
+		} else {
+		    print TABLEFILE "0\t";
+		}
+	    }
+	    if ( $consensusBase eq "" ) {   # If all bases are below the min %cutoff
+		$consensusBase = "N";
+	    }
+	    print TABLEFILE $ambiguityHash{$consensusBase}, "\t";
+	} else {
+	    print TABLEFILE "0\t0\t0\t0\t";
+	    $consensusBase = "N";
+	}
+	print TABLEFILE $missingBase, "\n";
+	print CONSENSUSFILE $ambiguityHash{$consensusBase};
     }
-    print TABLEFILE $missingBase, "\n";
-    print CONSENSUSFILE $ambiguityHash{$consensusBase};
 }
 
 print CONSENSUSFILE "\n";
