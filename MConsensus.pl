@@ -219,6 +219,8 @@ while(my $input = <GIANNOT>) {
     #if($input =~ /gene.*\tcytb|gene.*\tcob/i && $lastline =~ /[0-9]+\t[0-9]+\tgene/i){
     if($input =~ /$geneMatch/i && $lastline =~ /[0-9]+\t[0-9]+\t$geneType/i){
         my ($number, $number2, undef) = split "\t", $lastline;
+	$number =~ s/<//g;
+	$number2 =~ s/<//g;
 	$annotHash{$header} = $number . "\t" . $number2;	# make hash of positions $hash{header} = pos;
     
 	if($number eq "") {
@@ -276,7 +278,7 @@ if($verbose) {
 }
 # Made mafft the default because of the ability to adjust the direction of the sequences
 #$alignCommand = "mafft --adjustdirectionaccurately --globalpair --thread " . $p . " " . $outDir . "allSeqs.fasta > " . $outDir."allSeqsAligned.fasta";
-$alignCommand = "mafft --quiet --auto --adjustdirectionaccurately --globalpair --thread " . $p . " " . $outDir . "originalGisFixed.fasta > " . $outDir."allSeqsAligned.fasta";
+$alignCommand = "mafft --quiet --maxiterate 1000 --localpair --adjustdirectionaccurately --thread " . $p . " " . $outDir . "originalGisFixed.fasta > " . $outDir."allSeqsAligned.fasta";
 if($verbose) {
     $alignCommand =~ s/mafft --quiet/mafft/;
 }
@@ -417,11 +419,11 @@ if($verbose) {
 # POD
 ##############################
 
+=head NAME
+
+    MConsensus.pl - generates a consensus for a specified gene in a specified taxa
     
 =head SYNOPSIS
-
-   
-    MConsensus.pl - generates a consensus for a specified gene in a specified taxa
     
     perl MConsensus.pl [options]
 
