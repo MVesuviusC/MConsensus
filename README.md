@@ -1,6 +1,19 @@
 # MConsensus.pl
 
   Generate a consensus for a specified gene in a specified taxa
+
+## A word of warning
+
+  This script is a PITA. It requires a lot of babysitting of the output to make sure it's outputting something 
+  meaningful and not a load of junk. If you're not comfortable looking through the perl code to figure things
+  out I would recommend steering clear. If you do try to use it I would recommend at a minimum using the 
+  --verbose option and watching the output. Also, look over your alignment output to be sure that it looks 
+  like a decent alignment. If your alignment is bad, your consensus is going to be bad. There are a lot of 
+  poorly annotated sequences on NCBI and they can mess up everything pretty badly in this script. In the 
+  future I'd like to allow the script to accept a "black list" of accessions to omit from the analysis. 
+  That way if you run it and find some bad sequences you can rerun it while ignoring them. But for now you 
+  have to carefully watch the output. So, I would recommend not using this script unless you feel like wading
+  into a bit of a mess potentially.
     
 ## perl MConsensus.pl [options]
 
