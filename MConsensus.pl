@@ -214,15 +214,15 @@ while(my $input = <GIANNOT>) {
         $header =~ s/.+\|//;
 	#print $header, "\n";
     }
-    #if($input =~ /gene.*\tcytb/i || $input =~ /gene.*\tcob/i && $lastline =~ /[0-9]+\t[0-9]+\tgene/i) {
-    #my $geneMatch = "gene.*\tcytb|gene.*\tcob";
-    #if($input =~ /gene.*\tcytb|gene.*\tcob/i && $lastline =~ /[0-9]+\t[0-9]+\tgene/i){
     if($input =~ /$geneMatch/i && $lastline =~ /[0-9]+\t[0-9]+\t$geneType/i){
         my ($number, $number2, undef) = split "\t", $lastline;
-	$number =~ s/<//g;
-	$number2 =~ s/<//g;
-	$annotHash{$header} = $number . "\t" . $number2;	# make hash of positions $hash{header} = pos;
-    
+	#$number =~ s/<//g;
+	#$number2 =~ s/<//g;
+	#$number =~ s/>//g;
+	#$number2 =~ s/>//g;
+	if($number !~ /[<>]/ && $number2 !~ /[<>]/) { 
+	    $annotHash{$header} = $number . "\t" . $number2;	# make hash of positions $hash{header} = pos;
+	}
 	if($number eq "") {
 	    print STDERR $header, "\t", $lastline, "\n";
 	}
@@ -250,6 +250,14 @@ while(my $input = <GIFASTA>) {
         my $seq = join("", @sequence);
         $seq =~ s/[\t\s]//g;
         my $fixedSeq = substr($seq, $start, abs($end - $start));
+	if($shortHeader =~ /KX008320.1/) {
+	    print STDERR 
+		"\n\n\n\n\n\n", $shortHeader, "\t", 
+		$annotHash{$shortHeader}, 
+		$seq, "\t", $fixedSeq,
+		"\n\n\n\n\n\n";
+	    die;
+	}
 	print GIFASTAFIXED ">", $header, "\n", $fixedSeq, "\n";
     } else {
 	$badCount++;
