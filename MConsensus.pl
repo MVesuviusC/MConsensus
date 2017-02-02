@@ -25,6 +25,7 @@ my $geneNameToMatch = "gene\tcytb,gene\tcob";
 my $geneType = "gene";
 my $outDir = "";
 my $allowPartial;
+my $blackList = "";
 my $p = 1;
 my $minAf = 20;
 my $verbose;
@@ -38,6 +39,7 @@ GetOptions ("retmax=i"          => \$retmax,
 	    "geneType=s"        => \$geneType,
             "outDir=s"          => \$outDir,
 	    "allowPartial"      => \$allowPartial,
+	    "blacklist=s"       => \$blackList,
 	    "processors=i"      => \$p,
 	    "minAF=i"           => \$minAf,
             "verbose"           => \$verbose,
@@ -55,9 +57,7 @@ my @tempFiles;
 my @giArray;
 my %annotHash;
 my $efetch = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&rettype=fasta&retmode=text&id=";
-my $blastOutfmt = "-outfmt \"6 sgi staxids length pident evalue bitscore sseq\"";
 my $giRetrieveNum = 1;
-my %blastResultsHash;
 my %alignmentHash;
 my %ambiguityHash = (
         A     => "A",
@@ -78,6 +78,7 @@ my %ambiguityHash = (
         N     => "N");
 my $seqCount = 0;
 my @speciesList;
+my %blackHash;
 
 ##############################
 # Code
@@ -201,20 +202,11 @@ while(my $input = <GIANNOT>) {
         $header =~ s/\|$//;
         $header =~ s/.+\|//;
     }
-#print STDERR $lastline, "\t", "geneType: $geneType", "\n", $input, "geneMatch: $geneMatch\ndone\n";
     if($allowPartial) {
 	$lastline =~ s/[\<\>]//g;
     }
     if($input =~ /$geneMatch/i && $lastline =~ /[0-9]+\t[0-9]+\t$geneType/i){
         my ($number, $number2, undef) = split "\t", $lastline;
-	#if($allowPartial) {
-	#    $number =~ s/<//g;
-	#    $number2 =~ s/<//g;
-	#    $number =~ s/>//g;
-	#    $number2 =~ s/>//g;
-	#    print STDERR $number, "\t", $number2, "\n";
-	#    die;
-	#}
 	if($number !~ /[<>]/ && $number2 !~ /[<>]/) { 
 	    if($number < $number2) {
 		$annotHash{$header} = $number . "\t" . $number2;	# make hash of positions $hash{header} = pos;
@@ -231,7 +223,21 @@ $lastline = $input;
 close GIANNOT;
 
 ##############################
+### If provided, pull in blacklist of and create hash 
+if($blackList ne "") {
+    open (BLACKLIST, "$blackList") or die "Cannot open blacklist file\n";
+    while(my $blackIn = <BLACKLIST>) {
+	chomp $blackIn;
+	$blackIn =~ s/[\s\t]//g;
+	$blackHash{$blackIn} = 1;
+    } 
+close BLACKLIST;
+}
+
+
+##############################
 ### Use hash of positions to pull in each fasta entry and rearrange it, then print out fixed fasta
+### Also fail to print any sequence found in blacklist
 $/ = "\n>";
 open (GIFASTA, "<", $outDir."originalGis.fasta") or die "Cannot open originalGis.fasta.\n";
 open (GIFASTAFIXED, ">", $outDir."originalGisFixed.fasta") or die "Cannot open originalGisFixed.fasta.\n";
@@ -244,7 +250,7 @@ while(my $input = <GIFASTA>) {
     my $shortHeader = $header;
     $shortHeader =~ s/>//;
     $shortHeader =~ s/\s.+//;
-    if(defined($annotHash{$shortHeader})) {
+    if(defined($annotHash{$shortHeader}) && !defined($blackHash{$shortHeader})) {
 	my ($start, $end) = split "\t", $annotHash{$shortHeader};
         my $seq = join("", @sequence);
         $seq =~ s/[\t\s]//g;
@@ -439,12 +445,6 @@ if($verbose) {
     
 =over 4
 
-=item B<blastx>
-    
-  blastx: blastn is used by this program and needs to be in your $PATH
-    Be sure the $BLASTDB system variable is set to point to the directory containing the taxdb 
-    database. This is done by export BLASTDB='absolute/path/to/your/blastdb/'
-
 =item B<mafft>
 
   mafft: mafft is used to align the sequences obtained and needs to be in your $PATH
@@ -472,6 +472,14 @@ if($verbose) {
     in quotes and put a plus between the words. I would highly recommend testing your search here: 
         I<http://www.ncbi.nlm.nih.gov/nuccore/>
 
+=item B<--geneNameToMatch> ("gene\tcytb,gene\tcob")
+
+    Fill this in later
+
+=item B<--geneType> ("gene")
+
+    Fill this in later
+
 =item B<--email> (matthewvc1@gmail.com)
 
     Your email. This is used in the query to NCBI.
@@ -484,6 +492,17 @@ if($verbose) {
 =item B<--processors> (1)
 
     The number of processors to use.
+
+=item B<--allowPartial> 
+
+    This is a flag that tells the program to allow partial sequences to be used in the alignment and consensus.
+    A partial sequence is defined as having either ">" or "<" in either of the gene position fields in the 
+    annotation. 
+
+=item B<--blackList>
+
+    This is a simple list of accessions to exclude from the alignment and consensus. This is found after the
+    ">" in the fasta file and up to (but not including) the first space. eg: KY119968.1. 
 
 =item B<--minAF> (20)
 
