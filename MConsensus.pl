@@ -24,15 +24,8 @@ my $email = "matthewvc1\@gmail.com";
 my $geneNameToMatch = "gene\tcytb,gene\tcob";
 my $geneType = "gene";
 my $outDir = "";
-my $blastDb = "nt";
-my $blastHitCount = 10;
-my $maxEval = 0.001;
 my $p = 1;
-my $clustalo;
-my $kalign;
-my $pidentCutoff = 80;
 my $minAf = 20;
-my $blMinLen = 100;
 my $verbose;
 my $help;
 
@@ -43,15 +36,8 @@ GetOptions ("retmax=i"          => \$retmax,
 	    "geneNameToMatch=s" => \$geneNameToMatch,
 	    "geneType=s"        => \$geneType,
             "outDir=s"          => \$outDir,
-            "blastDb=s"         => \$blastDb,
-            "blastHitCount=i"   => \$blastHitCount,
-	    "maxEval=i"         => \$maxEval,
-            "processors=i"      => \$p,
-	    "clustalo"          => \$clustalo,
-	    "kalign"            => \$kalign,
-            "percIdentCutoff=i" => \$pidentCutoff,
-            "blastMinLen=i"     => \$blMinLen,
-            "minAF=i"           => \$minAf,
+	    "processors=i"      => \$p,
+	    "minAF=i"           => \$minAf,
             "verbose"           => \$verbose,
             "help"              => \$help            
 ) or pod2usage(1) && exit;
@@ -485,29 +471,9 @@ if($verbose) {
     The directory to write the files out to. By default, the directory is named for the organism and
     month/day/time the script is run.
 
-=item B<--blastDb> (nt)
-
-    Location of the nt blast database.
-
-=item B<--blastHitCount> (10)
-
-    Number of blast hits to retrieve per sequence retrieved from NCBI.
-
-=item B<--maxEval> (0.001)
-
-    Maximum e-value to be included in blast results
-
 =item B<--processors> (1)
 
     The number of processors to use.
-
-=item B<--percIdentCutoff> (80)
-
-    This is the minimum percent similarity to be included in the blast results
-
-=item B<--blastMinLen> (100)
-
-    This is the shortest sequence retrieved during the blast step that can be kept.
 
 =item B<--minAF> (20)
 
