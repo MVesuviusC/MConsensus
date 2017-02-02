@@ -24,6 +24,7 @@ my $email = "matthewvc1\@gmail.com";
 my $geneNameToMatch = "gene\tcytb,gene\tcob";
 my $geneType = "gene";
 my $outDir = "";
+my $allowPartial;
 my $p = 1;
 my $minAf = 20;
 my $verbose;
@@ -36,6 +37,7 @@ GetOptions ("retmax=i"          => \$retmax,
 	    "geneNameToMatch=s" => \$geneNameToMatch,
 	    "geneType=s"        => \$geneType,
             "outDir=s"          => \$outDir,
+	    "allowPartial"      => \$allowPartial,
 	    "processors=i"      => \$p,
 	    "minAF=i"           => \$minAf,
             "verbose"           => \$verbose,
@@ -198,14 +200,21 @@ while(my $input = <GIANNOT>) {
         $header = $input;
         $header =~ s/\|$//;
         $header =~ s/.+\|//;
-	#print $header, "\n";
+    }
+#print STDERR $lastline, "\t", "geneType: $geneType", "\n", $input, "geneMatch: $geneMatch\ndone\n";
+    if($allowPartial) {
+	$lastline =~ s/[\<\>]//g;
     }
     if($input =~ /$geneMatch/i && $lastline =~ /[0-9]+\t[0-9]+\t$geneType/i){
         my ($number, $number2, undef) = split "\t", $lastline;
-	#$number =~ s/<//g;
-	#$number2 =~ s/<//g;
-	#$number =~ s/>//g;
-	#$number2 =~ s/>//g;
+	#if($allowPartial) {
+	#    $number =~ s/<//g;
+	#    $number2 =~ s/<//g;
+	#    $number =~ s/>//g;
+	#    $number2 =~ s/>//g;
+	#    print STDERR $number, "\t", $number2, "\n";
+	#    die;
+	#}
 	if($number !~ /[<>]/ && $number2 !~ /[<>]/) { 
 	    if($number < $number2) {
 		$annotHash{$header} = $number . "\t" . $number2;	# make hash of positions $hash{header} = pos;
@@ -352,7 +361,8 @@ for my $baseNum ( sort {$a <=> $b} keys %alignmentHash) {
         }
     }
     my $countCutoff = ($minAf / 100) * $speciesCount; # minimum number of counts
-    if($missingBase < $countCutoff) {  #keep only those bases that have info at more than $minAf % bases
+    if($missingBase < $countCutoff || $allowPartial) {  # keep only those bases that have info at more than $minAf % bases 
+	                                                # keep all bases if allow partial is enabled - otherwise the consensus can be super short 
 
 	print TABLEFILE $baseNum, "\t";
 	if($speciesCount > 0) {
@@ -454,7 +464,7 @@ if($verbose) {
 
     The organism to be queried. Use scientific names (e.g. canidae) or other names recognized by 
     NCBI database (e.g. salamanders). I would highly recommend testing your search here: 
-        I<http://www.ncbi.nlm.nih.gov/nuccore/>
+        http://www.ncbi.nlm.nih.gov/nuccore/
 
 =item B<--gene> ("mitochondria+\"complete+genome\"")
 
