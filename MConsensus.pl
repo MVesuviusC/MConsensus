@@ -189,7 +189,7 @@ close GIANNOT;
 
 $/ = "\n";
 open (GIANNOT, "<", $outDir."originalGisAnnot.txt") or die "Cannot open originalGisAnnot.txt.\n";
-my $lastline;
+my $lastline = "";
 my $header;
 
 my @matchGenes = split ",", $geneNameToMatch;
@@ -336,7 +336,7 @@ open (CONSENSUSFILE, ">", $outDir . "Consensus.fasta") or die "Cannot write to c
 open (TABLEFILE, ">", $outDir . "ConsensusTable.txt") or die "Cannot write to consensus table output file\n";
 
 print TABLEFILE "AlignmentBase\tA\tT\tG\tC\tConsensus\tMissing\n";
-print CONSENSUSFILE ">$organism\n";
+print CONSENSUSFILE ">", $organism, "_", $gene, "_", $geneNameToMatch, "\n";
 
 for my $baseNum ( sort {$a <=> $b} keys %alignmentHash) {
     my %currentBase;
