@@ -221,7 +221,11 @@ while(my $input = <GIANNOT>) {
 	#$number =~ s/>//g;
 	#$number2 =~ s/>//g;
 	if($number !~ /[<>]/ && $number2 !~ /[<>]/) { 
-	    $annotHash{$header} = $number . "\t" . $number2;	# make hash of positions $hash{header} = pos;
+	    if($number < $number2) {
+		$annotHash{$header} = $number . "\t" . $number2;	# make hash of positions $hash{header} = pos;
+	    } else {
+		$annotHash{$header} = $number2 . "\t" . $number;
+	    }
 	}
 	if($number eq "") {
 	    print STDERR $header, "\t", $lastline, "\n";
@@ -246,18 +250,10 @@ while(my $input = <GIFASTA>) {
     $shortHeader =~ s/>//;
     $shortHeader =~ s/\s.+//;
     if(defined($annotHash{$shortHeader})) {
-	my ($end, $start) = split "\t", $annotHash{$shortHeader};
+	my ($start, $end) = split "\t", $annotHash{$shortHeader};
         my $seq = join("", @sequence);
         $seq =~ s/[\t\s]//g;
-        my $fixedSeq = substr($seq, $start, abs($end - $start));
-	if($shortHeader =~ /KX008320.1/) {
-	    print STDERR 
-		"\n\n\n\n\n\n", $shortHeader, "\t", 
-		$annotHash{$shortHeader}, 
-		$seq, "\t", $fixedSeq,
-		"\n\n\n\n\n\n";
-	    die;
-	}
+        my $fixedSeq = substr($seq, $start - 1, ($end - $start) + 1);
 	print GIFASTAFIXED ">", $header, "\n", $fixedSeq, "\n";
     } else {
 	$badCount++;
