@@ -26,6 +26,8 @@ my $geneType = "gene";
 my $outDir = "";
 my $allowPartial;
 my $blackList = "";
+my $minLen = 0;
+my $maxLen = "inf";
 my $p = 1;
 my $minAf = 20;
 my $verbose;
@@ -40,6 +42,8 @@ GetOptions ("retmax=i"          => \$retmax,
             "outDir=s"          => \$outDir,
 	    "allowPartial"      => \$allowPartial,
 	    "blacklist=s"       => \$blackList,
+	    "minLen=i"          => \$minLen,
+	    "maxLen=i"          => \$maxLen,
 	    "processors=i"      => \$p,
 	    "minAF=i"           => \$minAf,
             "verbose"           => \$verbose,
@@ -255,7 +259,9 @@ while(my $input = <GIFASTA>) {
         my $seq = join("", @sequence);
         $seq =~ s/[\t\s]//g;
         my $fixedSeq = substr($seq, $start - 1, ($end - $start) + 1);
-	print GIFASTAFIXED ">", $header, "\n", $fixedSeq, "\n";
+	if(length($fixedSeq) > $minLen && length($fixedSeq) < $maxLen) { # get rid of any sequences too short or too long
+	    print GIFASTAFIXED ">", $header, "\n", $fixedSeq, "\n";
+	}
     } else {
 	$badCount++;
 	print BADANNOT $header, "\n";
