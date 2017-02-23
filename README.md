@@ -9,30 +9,21 @@
   out I would recommend steering clear. If you do try to use it I would recommend at a minimum using the 
   --verbose option and watching the output. Also, look over your alignment output to be sure that it looks 
   like a decent alignment. If your alignment is bad, your consensus is going to be bad. There are a lot of 
-  poorly annotated sequences on NCBI and they can mess up everything pretty badly in this script. In the 
-  future I'd like to allow the script to accept a "black list" of accessions to omit from the analysis. 
-  That way if you run it and find some bad sequences you can rerun it while ignoring them. But for now you 
-  have to carefully watch the output. So, I would recommend not using this script unless you feel like wading
-  into a bit of a mess potentially.
+  poorly annotated sequences on NCBI and they can mess up everything pretty badly in this script. So, I would 
+  recommend not using this script unless you feel like wading into a bit of a mess potentially.
     
 ## perl MConsensus.pl [options]
 
   This script takes in an organism name (any scientific taxon) and a gene (or other genetic element) name.
-  The script then downloads all the sequences for that query from the NCBI nt database. Those sequences are 
-  then blasted against a local nt database to get any additional sequences (matching the input organism). 
-  All the sequences are then combined and aligned using kalign. The consensus sequence of the alignment is
-  then output as both a fasta and as a table of counts for each A/T/G/C at each position. 
+  The script then downloads all the sequences for that query from the NCBI nt database. All sequences are 
+  then aligned using mafft. The consensus sequence of the alignment is then output as both a fasta and as 
+  a table of counts for each A/T/G/C at each position. 
 
 ## Dependencies
 
 ### This program is designed to work on Unix 
     
-### blastx: blastn is used by this program and needs to be in your $PATH
-    
-  Be sure the $BLASTDB system variable is set to point to the directory containing the taxdb 
-  database. This is done by export BLASTDB='absolute/path/to/your/blastdb/'
-
-### kalign: kalign is used to align the sequences obtained and needs to be in your $PATH
+### mafft: mafft is used to align the sequences obtained and needs to be in your $PATH
 
 
 ## Output files
@@ -42,12 +33,6 @@ allSeqsAligned.fasta
 
 allSeqs.fasta
 - All sequences (both blast results and sequences retrieved from NCBI).
-
-blastFasta.fasta
-- Fasta file of sequences from Blast results
-
-blastResults.txt
-- Results of Blasting the originalGis.fasta
 
 Consensus.fasta
 - Final file that you will want to look at. Fasta file of the consensus.
@@ -102,30 +87,35 @@ originalGis.txt
   The directory to write the files out to. By default, the directory is named for the organism and
   month/day/time the script is run.
 
---blastDb (nt)
-
-  Location of the nt blast database.
-
---blastHitCount (10)
-
-  Number of blast hits to retrieve per sequence retrieved from NCBI.
-
 --processors (1)
 
   The number of processors to use.
-
---percIdentCutoff (80)
-
-  This is the minimum percent similarity to be included in the blast results
-
---blastMinLen (100)
-
-  This is the shortest sequence retrieved during the blast step that can be kept.
 
 --minAF (20)
 
   This is the minimum allele frequency (in percentage) to include when generating the consensus sequence.
   A lower value will result in more ambiguous bases. 
+
+--allowPartial
+
+  This is a flag that tells the program to allow partial sequences to be used in the alignment and consensus.
+  A partial sequence is defined as having either ">" or "<" in either of the gene position fields in the 
+  annotation. This option will force the consensus generation algorithm to ignore positions with lots of gaps.
+  This means that positions covered by at least one base will be included. Use the consensusTable.txt file 
+  to filter out positions with low sequence coverage.
+
+--blackList
+
+  This is a simple list of accessions to exclude from the alignment and consensus. This is found after the
+  ">" in the fasta file and up to (but not including) the first space. eg: KY119968.1.
+
+--minLen (0)
+
+  Minimum sequence length to be kept.
+
+--maxLen (INF)
+
+  Maximum sequence length to be kept.
 
 --verbose
 
@@ -134,3 +124,22 @@ originalGis.txt
 --help 
 
   Print out this "helpful" information. 
+
+
+## Examples
+
+You can run it with default settings like this:
+
+`perl MConsensus.pl`
+
+Or you can specify the organism and gene like this:
+
+`perl MConsensus.pl --out cytbCephalopoda --processors 20 --retmax 2000 --organism Cephalopoda --geneName "gene\tcytb,gene\tcob" --verbose`
+
+Or you can tell it to search for 18S rRNA instead of mtDNA, allow partial sequences, specify a blacklist of GIs and a minimum sequence length
+
+`perl MConsensus.pl --out 18SNematoda --processors 20 --retmax 2000 --organism Nematoda --geneType rRNA --verbose --geneName "product\t18" --gene "18S+rRNA" --allowPartial --blackList 18SNematoda/blacklist.txt --minLen 100`
+
+  Be careful when using the -allowPartial option, as this allows the consensus algorithm to keep all alignment positions, with no regard
+  for how many sequences cover that position. It is a good idea to look at the consensusTable.txt file in excel and filter out
+  any positions not covered by enough sequences.  

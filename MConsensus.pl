@@ -515,6 +515,14 @@ if($verbose) {
     This is the minimum allele frequency (in percentage) to include when generating the consensus sequence.
     A lower value will result in more ambiguous bases. 
 
+=item B<--minLen> (0)
+
+  Minimum sequence length to be kept.
+
+=item B<--maxLen> (INF)
+
+  Maximum sequence length to be kept.
+
 =item B<--verbose>
 
     This option prints out status updates while the program runs.
