@@ -130,15 +130,15 @@ originalGis.txt
 
 You can run it with default settings like this:
 
-`perl MConsensus.pl`
+`perl MConsensus.pl --out exampleOut/basic/`
 
 Or you can specify the organism and gene like this:
 
-`perl MConsensus.pl --out cytbCephalopoda --processors 20 --retmax 2000 --organism Cephalopoda --geneName "gene\tcytb,gene\tcob" --verbose`
+`perl MConsensus.pl --out exampleOut/cytbCephalopoda --processors 20 --retmax 2000 --organism Cephalopoda --geneName "gene\tcytb,gene\tcob" --verbose`
 
 Or you can tell it to search for 18S rRNA instead of mtDNA, allow partial sequences, specify a blacklist of GIs and a minimum sequence length
 
-`perl MConsensus.pl --out 18SNematoda --processors 20 --retmax 2000 --organism Nematoda --geneType rRNA --verbose --geneName "product\t18" --gene "18S+rRNA" --allowPartial --blackList 18SNematoda/blacklist.txt --minLen 100`
+`perl MConsensus.pl --out exampleOut/18SNematoda --processors 20 --retmax 2000 --organism Nematoda --geneType rRNA --verbose --geneName "product\t18" --gene "18S+rRNA" --allowPartial --blackList 18SNematoda/blacklist.txt --minLen 100`
 
   Be careful when using the -allowPartial option, as this allows the consensus algorithm to keep all alignment positions, with no regard
   for how many sequences cover that position. It is a good idea to look at the consensusTable.txt file in excel and filter out
