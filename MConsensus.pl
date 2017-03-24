@@ -247,30 +247,39 @@ open (GIFASTA, "<", $outDir."originalGis.fasta") or die "Cannot open originalGis
 open (GIFASTAFIXED, ">", $outDir."originalGisFixed.fasta") or die "Cannot open originalGisFixed.fasta.\n";
 open (BADANNOT, ">", $outDir . "badAnnots.txt") or die "Cannot write to badAnnots.txt";
 my $badCount = 0;
+my %foundSpecies;
+my $speciesCount = 0;
 while(my $input = <GIFASTA>) {
     chomp $input;
     my ($header, @sequence) = split "\n", $input;
     $header =~ s/>//;
     my $shortHeader = $header;
-    $shortHeader =~ s/>//;
     $shortHeader =~ s/\s.+//;
-    if(defined($annotHash{$shortHeader}) && !defined($blackHash{$shortHeader})) {
-	my ($start, $end) = split "\t", $annotHash{$shortHeader};
-        my $seq = join("", @sequence);
-        $seq =~ s/[\t\s]//g;
-        my $fixedSeq = substr($seq, $start - 1, ($end - $start) + 1);
-	if(length($fixedSeq) > $minLen && length($fixedSeq) < $maxLen) { # get rid of any sequences too short or too long
-	    print GIFASTAFIXED ">", $header, "\n", $fixedSeq, "\n";
+    my $species = $header;
+    $species =~ s/.+?\s//;
+    $species =~ s/\s/_/;
+    $species =~ s/\s.+//;
+    if(!defined($foundSpecies{$species})) {	
+	if(defined($annotHash{$shortHeader}) && !defined($blackHash{$shortHeader})) {
+	    my ($start, $end) = split "\t", $annotHash{$shortHeader};
+	    my $seq = join("", @sequence);
+	    $seq =~ s/[\t\s]//g;
+	    my $fixedSeq = substr($seq, $start - 1, ($end - $start) + 1);
+	    if(length($fixedSeq) > $minLen && length($fixedSeq) < $maxLen) { # get rid of any sequences too short or too long
+		print GIFASTAFIXED ">", $header, "\n", $fixedSeq, "\n";
+	    }
+	} else {
+	    $badCount++;
+	    print BADANNOT $header, "\n";
 	}
-    } else {
-	$badCount++;
-	print BADANNOT $header, "\n";
-    }
+	$foundSpecies{$species} = 1;
+	$speciesCount++;
+    } 
 }
 if($verbose && $badCount > 0) {
-    print STDERR "A total of ", $badCount, " fasta annotations could not be parsed\nHeaders written to badAnnots.txt\n\n";
+    print STDERR "A total of ", $badCount, " fasta annotations could not be parsed\nHeaders written to badAnnots.txt\nA total of $speciesCount unique species kept\n\n";
 } elsif($verbose) {
-    print STDERR "All of your entries could be parsed. Amazing!\n\n";
+    print STDERR "All of your entries could be parsed. Amazing!\nA total of $speciesCount unique species kept\n\n";
 }
 close GIFASTA;
 close GIFASTAFIXED;
