@@ -268,12 +268,14 @@ while(my $input = <GIFASTA>) {
 	    if(length($fixedSeq) > $minLen && length($fixedSeq) < $maxLen) { # get rid of any sequences too short or too long
 		print GIFASTAFIXED ">", $header, "\n", $fixedSeq, "\n";
 	    }
+	    $speciesCount++;
+	    $foundSpecies{$species} = 1;
 	} else {
 	    $badCount++;
 	    print BADANNOT $header, "\n";
 	}
-	$foundSpecies{$species} = 1;
-	$speciesCount++;
+	#$foundSpecies{$species} = 1;
+	#$speciesCount++;
     } 
 }
 if($verbose && $badCount > 0) {
