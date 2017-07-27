@@ -19,7 +19,7 @@ use Pod::Usage;
 
 my $retmax = 1000;
 my $organism = "salamanders";
-my $gene = "mitochondrion+\"complete+genome\"";
+my $gene = "mitochondr*+\"complete+genome\"";
 my $email = "matthewvc1\@gmail.com";
 my $geneNameToMatch = "gene\tcytb,gene\tcob";
 my $geneType = "gene";
