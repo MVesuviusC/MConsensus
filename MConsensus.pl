@@ -24,6 +24,11 @@ my $email = "matthewvc1\@gmail.com";
 my $geneNameToMatch = "gene\tcytb,gene\tcob";
 my $geneType = "gene";
 my $outDir = "";
+my $kickOutDiffSeqs;
+my $minIdentToKick = 20; # minimum percent diff from another seq to cast vote to kick
+my $minPercentDiffToKick = 80; # minimum percent of kick votes to keep
+my $maxInsertToKick = 10; # max number of inserts to vote to kick
+my $minInsertPercentToKick = 70; # minimum percent of kick votes to keep
 my $allowPartial;
 my $blackList = "";
 my $minLen = 0;
@@ -33,21 +38,26 @@ my $minAf = 20;
 my $verbose;
 my $help;
 
-GetOptions ("retmax=i"          => \$retmax,
-            "organism=s"        => \$organism,
-            "gene=s"            => \$gene,
-            "email=s"           => \$email,
-	    "geneNameToMatch=s" => \$geneNameToMatch,
-	    "geneType=s"        => \$geneType,
-            "outDir=s"          => \$outDir,
-	    "allowPartial"      => \$allowPartial,
-	    "blacklist=s"       => \$blackList,
-	    "minLen=i"          => \$minLen,
-	    "maxLen=i"          => \$maxLen,
-	    "processors=i"      => \$p,
-	    "minAF=i"           => \$minAf,
-            "verbose"           => \$verbose,
-            "help"              => \$help            
+GetOptions ("retmax=i"                 => \$retmax,
+            "organism=s"               => \$organism,
+            "gene=s"                   => \$gene,
+            "email=s"                  => \$email,
+	    "geneNameToMatch=s"        => \$geneNameToMatch,
+	    "geneType=s"               => \$geneType,
+            "outDir=s"                 => \$outDir,
+	    "kickOutDiffSeqs"          => \$kickOutDiffSeqs,
+	    "minIdentToKick=i"         => \$minIdentToKick,
+	    "minPercentDiffToKick=i"   => \$minPercentDiffToKick,
+	    "maxInsertToKick=i"        => \$maxInsertToKick,
+	    "minInsertPercentToKick=i" => \$minInsertPercentToKick,
+	    "allowPartial"             => \$allowPartial,
+	    "blacklist=s"              => \$blackList,
+	    "minLen=i"                 => \$minLen,
+	    "maxLen=i"                 => \$maxLen,
+	    "processors=i"             => \$p,
+	    "minAF=i"                  => \$minAf,
+            "verbose"                  => \$verbose,
+            "help"                     => \$help            
 ) or pod2usage(1) && exit;
 
 pod2usage(2) && exit if ($help);
@@ -312,6 +322,129 @@ if($verbose) {
 }
 
 ############################
+### Read in alignment, count the number of differences between each sequence and kick out any over a given percent difference
+### I want to kick out any sequence that is more than X% different from more than Y% of all sequences
+### The intent is to remove any sequence that is completely off or has large insertions which can throw off the consensus
+
+if($kickOutDiffSeqs) {
+    my $kickedOutCount = 0;
+    my %diffsSeqHash;
+
+    if($verbose) {
+	print STDERR "Removing sequences too different from all others\n";
+	print STDERR "Check settings for this step: minIdentToKick:         $minIdentToKick\n";
+	print STDERR "                              minPercentDiffToKick:   $minPercentDiffToKick\n";
+	print STDERR "                              maxInsertToKick:        $maxInsertToKick\n";
+	print STDERR "                              minPercentInsertToKick: $minInsertPercentToKick\n";
+	print STDERR "Reading in alignment\n\n";
+    }
+    $/ = "\n>";
+    open (ALIGN, "<", $outDir . "allSeqsAligned.fasta") or die "Cannot open input file\n";
+
+    # Read in alignment by sequence
+    while(my $input = <ALIGN>) {
+	chomp $input;
+	my($header, @sequences) = split "\n", $input;
+	$header =~ s/^>//;                  # remove first ">"
+	my $sequence = join("", @sequences);
+	$sequence = uc($sequence);
+	$diffsSeqHash{$header} = $sequence;
+    }
+    close ALIGN;
+    my $command = "cp $outDir" . "allSeqsAligned.fasta $outDir" . "allSeqsAlignedOriginal.fasta"; # move the original alignment to save it
+    my $doit = `$command`;
+
+    open (DIFFCOUNTS, ">", $outDir . "alignedDiffCount.txt") or die "Cannot write to alignment difference count output file\n";
+
+    if($verbose) {
+	print STDERR "Filtering sequences\n";
+    }
+
+    my $kickedOutSeqsThisLoop = 1;
+    my $loopCount = 1;
+    my $kickedOutFromDiffs = 0;
+    my $kickedOutFromInserts = 0;
+    while($kickedOutSeqsThisLoop > 0) {
+	my @keys = keys %diffsSeqHash;
+	my @toRemove = (); # index of sequences to kick out
+	for(my $i = 0; $i < scalar(@keys); $i++) {  # for each sequence, check if it should be kicked
+	    my $tooDiffCount = 0;
+	    my $highInsertCount = 0;
+	    my $sequence = $diffsSeqHash{$keys[$i]};
+	    for(my $j = 0; $j < scalar(@keys); $j++) {  # go through all the seqs
+		my $compareSeq = $diffsSeqHash{$keys[$j]};
+		my $diffCount = 0;
+		my $insertCount = 0;
+		
+		# go through each base, count diffs and inserts
+		for(my $k = 0; $k < (length($sequence) - 1); $k++) { 
+		    my $seqBase = substr($sequence, $k, 1);
+		    my $compareBase = substr($compareSeq, $k, 1);
+		    if($seqBase ne $compareBase) {
+			############################# make exception for insertions???
+			$diffCount++;
+			if($compareBase eq "-") {
+			    $insertCount++;
+			}
+		    }
+		}          # percent similarity
+		if(100 * (1 - ($diffCount / length($sequence))) < $minIdentToKick) { # too different
+		    $tooDiffCount++;
+		}
+		if(100 * ($insertCount / length($sequence)) > $maxInsertToKick) { # too many inserts
+		    $highInsertCount++;
+		}
+
+		print DIFFCOUNTS $loopCount, "\t", $keys[$i], "\t", $keys[$j], "\t", 
+		        100 * (1 - ($diffCount / length($sequence))), "\t",
+            		100 * ($insertCount / length($sequence)), "\n";
+
+	    }         #Percent good
+	    if( 100 * (1 - ($tooDiffCount / scalar(@keys))) < $minPercentDiffToKick) {
+		push @toRemove, $i;
+		$kickedOutFromDiffs++;
+	    } elsif(100 * ($highInsertCount / scalar(@keys)) > $minInsertPercentToKick) {
+		push @toRemove, $i;
+		$kickedOutFromInserts++;
+	    }
+	}
+	for my $index (@toRemove) {
+	    delete $diffsSeqHash{$keys[$index]};
+	}
+	$kickedOutSeqsThisLoop = scalar(@toRemove);
+#	print STDERR "test", scalar(@toRemove), "\n";
+	$kickedOutCount += scalar(@toRemove);
+	$loopCount++;
+    }
+    close DIFFCOUNTS;
+
+    if($verbose) {
+	print STDERR "Printing out new alignment and summary file\n";
+    }
+
+    # Print it out here
+    open (NEWALIGN, ">", $outDir . "allSeqsAligned.fasta") or die "Cannot write to new alignment file\n";
+    for my $header (keys %diffsSeqHash) {
+	print NEWALIGN ">", $header, "\n", $diffsSeqHash{$header}, "\n";
+    }
+
+##########################
+########  Need to delete gaps in sequence, print it out as a fasta and re-align it
+##########################
+
+  
+    if($verbose) {
+	print STDERR "Removed $kickedOutCount sequences due to excess differences. Diffs: $kickedOutFromDiffs. Inserts: $kickedOutFromInserts\n\n";
+    }
+}
+
+$/ = "\n";
+
+############### Need to deal with positions that are all "-" after removing crap.
+
+
+
+############################
 # Parse aligned.aln with perl script to generate two things:
 #       -consensus sequence based on minumum %RAF/MiAF (consensus.fasta)
 #       -table file with one row per nt and one column per A/T/G/C with counts for
@@ -321,7 +454,6 @@ if($verbose) {
     print STDERR "Generating consensus from ", $outDir . "allSeqsAligned.fasta\n";
 }
 
-#system("perl scripts/summarizeAlignment.pl --input " . $outDir."allSeqsAligned.fasta");
 
 $/  = "\n>"; # change input delimiter
 open (ALIGN, "<", $outDir . "allSeqsAligned.fasta") or die "Cannot open input file\n";
@@ -483,7 +615,7 @@ if($verbose) {
     NCBI database (e.g. salamanders). I would highly recommend testing your search here: 
         http://www.ncbi.nlm.nih.gov/nuccore/
 
-=item B<--gene> ("mitochondria+\"complete+genome\"")
+=item B<--gene> ("mitochondr*+\"complete+genome\"")
 
     The gene sequence (or other genetic element) to be queried. If you use multiple words, put them 
     in quotes and put a plus between the words. I would highly recommend testing your search here: 
