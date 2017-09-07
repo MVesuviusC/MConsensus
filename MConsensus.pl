@@ -414,7 +414,6 @@ if($kickOutDiffSeqs) {
 	    delete $diffsSeqHash{$keys[$index]};
 	}
 	$kickedOutSeqsThisLoop = scalar(@toRemove);
-#	print STDERR "test", scalar(@toRemove), "\n";
 	$kickedOutCount += scalar(@toRemove);
 	$loopCount++;
     }
@@ -425,14 +424,21 @@ if($kickOutDiffSeqs) {
     }
 
     # Print it out here
-    open (NEWALIGN, ">", $outDir . "allSeqsAligned.fasta") or die "Cannot write to new alignment file\n";
+    open (NEWSEQS, ">", $outDir . "allSeqsFiltered.fasta") or die "Cannot write to new alignment file\n";
     for my $header (keys %diffsSeqHash) {
-	print NEWALIGN ">", $header, "\n", $diffsSeqHash{$header}, "\n";
+	my $seq = $diffsSeqHash{$header};
+	$seq =~ s/-//g;
+	print NEWSEQS ">", $header, "\n", $seq, "\n";
     }
 
-##########################
-########  Need to delete gaps in sequence, print it out as a fasta and re-align it
-##########################
+    open (NEWALIGN, ">", $outDir . "allSeqsAligned.fasta") or die "Cannot write to new alignment file\n";
+    my $newAlignCommand = $alignCommand;
+    $newAlignCommand =~ s/originalGisFixed.fasta/allSeqsFiltered.fasta/;
+    my $doit = `$newAlignCommand`;
+
+    if($verbose) {
+        print STDERR "Realignment completed\n\n";
+    }
 
   
     if($verbose) {
@@ -442,7 +448,7 @@ if($kickOutDiffSeqs) {
 
 $/ = "\n";
 
-############### Need to deal with positions that are all "-" after removing crap.
+
 
 
 
