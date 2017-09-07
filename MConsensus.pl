@@ -383,14 +383,16 @@ if($kickOutDiffSeqs) {
 		    if($seqBase ne $compareBase) {
 			############################# make exception for insertions???
 			$diffCount++;
-			if($compareBase eq "-") {
+			if($compareBase eq "-") { # if both are "-" it isn't an insert
 			    $insertCount++;
 			}
 		    }
-		}          # percent similarity
+		}          
+                # percent similarity
 		if(100 * (1 - ($diffCount / length($sequence))) < $minIdentToKick) { # too different
 		    $tooDiffCount++;
 		}
+		# percent inserts
 		if(100 * ($insertCount / length($sequence)) > $maxInsertToKick) { # too many inserts
 		    $highInsertCount++;
 		}
