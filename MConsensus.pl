@@ -269,25 +269,32 @@ while(my $input = <GIFASTA>) {
     $species =~ s/.+?\s//;
     $species =~ s/\s/_/;
     $species =~ s/\s.+//;
-    if(!defined($foundSpecies{$species})) {	
-	if(defined($annotHash{$shortHeader}) && !defined($blackHash{$shortHeader})) {
-	    my ($start, $end) = split "\t", $annotHash{$shortHeader};
-	    my $seq = join("", @sequence);
-	    $seq =~ s/[\t\s]//g;
-	    my $fixedSeq = substr($seq, $start - 1, ($end - $start) + 1);
+    if(defined($annotHash{$shortHeader}) && !defined($blackHash{$shortHeader})) {
+	my ($start, $end) = split "\t", $annotHash{$shortHeader};
+	my $seq = join("", @sequence);
+	$seq =~ s/[\t\s]//g;
+	my $fixedSeq = substr($seq, $start - 1, ($end - $start) + 1);
+	if(!defined($foundSpecies{$species})) {
+	    
 	    if(length($fixedSeq) > $minLen && length($fixedSeq) < $maxLen) { # get rid of any sequences too short or too long
-		print GIFASTAFIXED ">", $header, "\n", $fixedSeq, "\n"; ########### Need to change this to keep the longest sequence
-	    }
+		$foundSpecies{$species} = ">" . $header . "\n" . $fixedSeq;
+	    }	    
 	    $speciesCount++;
-	    $foundSpecies{$species} = 1;
-	} else {
-	    $badCount++;
-	    print BADANNOT $header, "\n";
+	} elsif (length($foundSpecies{$species}) < length($fixedSeq)) {
+	    $foundSpecies{$species} = ">" . $header . "\n" . $fixedSeq;
 	}
-	#$foundSpecies{$species} = 1;
-	#$speciesCount++;
-    } 
+    } else {
+	$badCount++;
+	print BADANNOT $header, "\n";
+    }
 }
+
+for my $keptSpecies (keys %foundSpecies) {
+    print GIFASTAFIXED $foundSpecies{$keptSpecies}, "\n";
+}
+## print out foundSpecies hash here
+
+
 if($verbose && $badCount > 0) {
     print STDERR "A total of ", $badCount, " fasta annotations could not be parsed\nHeaders written to badAnnots.txt\nA total of $speciesCount unique species kept\n\n";
 } elsif($verbose) {
