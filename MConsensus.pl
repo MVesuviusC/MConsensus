@@ -213,8 +213,8 @@ while(my $input = <GIANNOT>) {
     chomp $input;
     if($input =~ /^>/) {
         $header = $input;
-        $header =~ s/\|$//;
-        $header =~ s/.+\|//;
+	$header =~ s/.+?\|//;
+	$header =~ s/\|.*//;
     }
     if($allowPartial) {
 	$lastline =~ s/[\<\>]//g;
@@ -276,7 +276,7 @@ while(my $input = <GIFASTA>) {
 	    $seq =~ s/[\t\s]//g;
 	    my $fixedSeq = substr($seq, $start - 1, ($end - $start) + 1);
 	    if(length($fixedSeq) > $minLen && length($fixedSeq) < $maxLen) { # get rid of any sequences too short or too long
-		print GIFASTAFIXED ">", $header, "\n", $fixedSeq, "\n";
+		print GIFASTAFIXED ">", $header, "\n", $fixedSeq, "\n"; ########### Need to change this to keep the longest sequence
 	    }
 	    $speciesCount++;
 	    $foundSpecies{$species} = 1;
