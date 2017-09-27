@@ -431,10 +431,10 @@ if($kickOutDiffSeqs) {
 	print NEWSEQS ">", $header, "\n", $seq, "\n";
     }
 
-    open (NEWALIGN, ">", $outDir . "allSeqsAligned.fasta") or die "Cannot write to new alignment file\n";
+    #open (NEWALIGN, ">", $outDir . "allSeqsAligned.fasta") or die "Cannot write to new alignment file\n";
     my $newAlignCommand = $alignCommand;
     $newAlignCommand =~ s/originalGisFixed.fasta/allSeqsFiltered.fasta/;
-    my $doit = `$newAlignCommand`;
+    my $doit2 = `$newAlignCommand`;
 
     if($verbose) {
         print STDERR "Realignment completed\n\n";
