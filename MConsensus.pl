@@ -275,7 +275,6 @@ while(my $input = <GIFASTA>) {
 	$seq =~ s/[\t\s]//g;
 	my $fixedSeq = substr($seq, $start - 1, ($end - $start) + 1);
 	if(!defined($foundSpecies{$species})) {
-	    
 	    if(length($fixedSeq) > $minLen && length($fixedSeq) < $maxLen) { # get rid of any sequences too short or too long
 		$foundSpecies{$species} = ">" . $header . "\n" . $fixedSeq;
 	    }	    
@@ -292,7 +291,6 @@ while(my $input = <GIFASTA>) {
 for my $keptSpecies (keys %foundSpecies) {
     print GIFASTAFIXED $foundSpecies{$keptSpecies}, "\n";
 }
-## print out foundSpecies hash here
 
 
 if($verbose && $badCount > 0) {
