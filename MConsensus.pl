@@ -35,6 +35,7 @@ my $minLen = 0;
 my $maxLen = "inf";
 my $p = 1;
 my $minAf = 20;
+my $maxMissing = 80;
 my $verbose;
 my $help;
 
@@ -529,7 +530,7 @@ for my $baseNum ( sort {$a <=> $b} keys %alignmentHash) {
         }
     }
     my $countCutoff = ($minAf / 100) * $speciesCount; # minimum number of counts
-    if($missingBase < $countCutoff || $allowPartial) {  # keep only those bases that have info at more than $minAf % bases 
+    if(($missingBase / ($missingBase + $speciesCount)) * 100 < $maxMissing) {  # keep only those bases that have info at more than $minAf % bases 
 	                                                # keep all bases if allow partial is enabled - otherwise the consensus can be super short 
 
 	print TABLEFILE $baseNum, "\t";
