@@ -36,6 +36,7 @@ my $maxLen = "inf";
 my $p = 1;
 my $minAf = 20;
 my $maxMissing = 80;
+my $speciesWordsToKeep = 2;
 my $verbose;
 my $help;
 
@@ -57,6 +58,8 @@ GetOptions ("retmax=i"                 => \$retmax,
 	    "maxLen=i"                 => \$maxLen,
 	    "processors=i"             => \$p,
 	    "minAF=i"                  => \$minAf,
+	    "maxMissing=i"             => \$maxMissing,
+	    "speciesWordsToKeep=i"     => \$speciesWordsToKeep,
             "verbose"                  => \$verbose,
             "help"                     => \$help            
 ) or pod2usage(1) && exit;
@@ -268,7 +271,9 @@ while(my $input = <GIFASTA>) {
     $shortHeader =~ s/\s.+//;
     my $species = $header;
     $species =~ s/.+?\s//;
-    $species =~ s/\s/_/;
+    for(my $i = 1; $i < $speciesWordsToKeep; $i++) {
+	$species =~ s/\s/_/;
+    }
     $species =~ s/\s.+//;
     if(defined($annotHash{$shortHeader}) && !defined($blackHash{$shortHeader})) {
 	my ($start, $end) = split "\t", $annotHash{$shortHeader};
