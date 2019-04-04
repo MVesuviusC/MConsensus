@@ -93,7 +93,8 @@ my %ambiguityHash = (
         ATC   => "H",
         TGC   => "B", 
         ATGC  => "N",
-        N     => "N");
+        N     => "N",
+        "-"   => "-");
 my $seqCount = 0;
 my @speciesList;
 my %blackHash;
@@ -509,7 +510,7 @@ print CONSENSUSFILE ">", $organism, "_", $gene, "_", $geneNameToMatch, "\n";
 for my $baseNum ( sort {$a <=> $b} keys %alignmentHash) {
     my %currentBase;
     my $speciesCount = 0;
-    my @baseArray = ("A", "T", "G", "C");
+    my @baseArray = ("-", "A", "T", "G", "C");
     my $missingBase = 0;
     my $consensusBase = "";
     for my $species (keys %{ $alignmentHash{$baseNum} }) {      # Generate a consensus sequence per species
@@ -527,38 +528,37 @@ for my $baseNum ( sort {$a <=> $b} keys %alignmentHash) {
                 $topBase = $base;
             }
         }
-        if($topBase ne "-") {
-            $currentBase{$topBase}++;
-            $speciesCount++;
-        } else {
+        $currentBase{$topBase}++;
+	$speciesCount++;
+	if($topBase eq "-") {
             $missingBase++;
         }
     }
     my $countCutoff = ($minAf / 100) * $speciesCount; # minimum number of counts
-    if(($missingBase / ($missingBase + $speciesCount)) * 100 < $maxMissing) {  # keep only those bases that have info at more than $minAf % bases 
-	                                                # keep all bases if allow partial is enabled - otherwise the consensus can be super short 
 
-	print TABLEFILE $baseNum, "\t";
-	if($speciesCount > 0) {
-	    #my $countCutoff = ($minAf / 100) * $speciesCount; # minimum number of counts
-	    for my $topBase (@baseArray) {
-		if(exists($currentBase{$topBase})) {
-		    print TABLEFILE $currentBase{$topBase}, "\t";
-		    if($currentBase{$topBase} >= $countCutoff) {
-			$consensusBase .= $topBase;
-		    }
-		} else {
-		    print TABLEFILE "0\t";
+    print TABLEFILE $baseNum, "\t";
+    if(($missingBase / $speciesCount) * 100 < $maxMissing) { # don't bother with any position where greater than $maxMissing percent of sequences are "-"
+	for my $topBase (@baseArray) {
+	    if(exists($currentBase{$topBase})) {
+		
+		print TABLEFILE $currentBase{$topBase}, "\t";
+		if($currentBase{$topBase} >= $countCutoff && $consensusBase ne "-") { # if "-" makes up a proportion greater than minAf, 
+		                                                                      # just call it an insertion to prevent primer from being put down
+		                                                                      # it is important that @baseArray starts with "-" for this
+		    $consensusBase .= $topBase;
 		}
+	    } else {
+		print TABLEFILE "0\t";
 	    }
-	    if ( $consensusBase eq "" ) {   # If all bases are below the min %cutoff
-		$consensusBase = "N";
-	    }
-	    print TABLEFILE $ambiguityHash{$consensusBase}, "\t";
-	} else {
-	    print TABLEFILE "0\t0\t0\t0\t";
+	}
+	if ($consensusBase eq "") {   # If all bases are below the min %cutoff
 	    $consensusBase = "N";
 	}
+	print TABLEFILE $ambiguityHash{$consensusBase}, "\t";  
+#	} else {
+#	    print TABLEFILE "0\t0\t0\t0\t";
+#	    $consensusBase = "N";
+#	}
 	print TABLEFILE $missingBase, "\n";
 	print CONSENSUSFILE $ambiguityHash{$consensusBase};
     }
