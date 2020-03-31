@@ -21,6 +21,7 @@ my $retmax = 1000;
 my $organism = "salamanders";
 my $gene = "mitochondr*+\"complete+genome\"";
 my $email = "matthewvc1\@gmail.com";
+my $api_key;
 my $geneNameToMatch = "gene\tcytb,gene\tcob";
 my $geneType = "gene";
 my $outDir = "";
@@ -44,6 +45,7 @@ GetOptions ("retmax=i"                 => \$retmax,
             "organism=s"               => \$organism,
             "gene=s"                   => \$gene,
             "email=s"                  => \$email,
+	    "api_key=s"                => \$api_key,
 	    "geneNameToMatch=s"        => \$geneNameToMatch,
 	    "geneType=s"               => \$geneType,
             "outDir=s"                 => \$outDir,
@@ -102,6 +104,12 @@ my %blackHash;
 ##############################
 # Code
 ##############################
+
+if($api_key) {
+    my $replacement = "\?api_key=" . $api_key . "&db";
+    $nucSearch =~ s/\?db/$replacement/;
+    $efetch =~ s/\?db/$replacement/; 
+}
 
 ##############################
 ### Make an output directory (output[date/time]/)
@@ -191,9 +199,18 @@ my $annotCommand;
 while(scalar(@gisToGet) > 200) {
     my @currentGis = splice(@gisToGet, 0, 200);
     $annotCommand = "GET \"eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&rettype=ft&retmode=text&id=" . join(',', @currentGis) . "&email=". $email . "\"";
+    if($api_key) {
+	my $replacement = "\?api_key=" . $api_key . "&db";
+	$annotCommand =~ s/\?db/$replacement/;
+    }
+
     $annotResponse .= `$annotCommand`;
 }
 $annotCommand = "GET \"eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&rettype=ft&retmode=text&id=" . join(',', @gisToGet) . "&email=". $email . "\"";
+if($api_key) {
+    my $replacement = "\?api_key=" . $api_key . "&db";
+    $annotCommand =~ s/\?db/$replacement/;
+}
 $annotResponse .= `$annotCommand`;
 
 open (GIANNOT, ">", $outDir."originalGisAnnot.txt") or die "Cannot create originalGisAnnot.txt, check permissions\n";
